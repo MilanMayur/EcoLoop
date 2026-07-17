@@ -1,0 +1,25 @@
+"use client";
+
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { monthlyWaste, wasteCategories } from "@/data/dashboard";
+
+const tooltipStyle = { borderRadius: 12, border: "1px solid #E2E8F0", boxShadow: "0 12px 30px rgba(15,23,42,.08)", fontSize: 11 };
+
+export function WasteTrendChart({ mode = "bar" }: { mode?: "bar" | "line" }) {
+  return (
+    <div className="h-64 w-full" aria-label="Monthly waste collection and recycling chart">
+      <ResponsiveContainer width="100%" height="100%">
+        {mode === "bar" ? <BarChart data={monthlyWaste} margin={{ top: 10, right: 4, left: -22, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={.7} /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><Tooltip contentStyle={tooltipStyle} cursor={{ fill: "#F1F5F9" }} /><Bar dataKey="collected" name="Collected (kg)" fill="#CBD5E1" radius={[5, 5, 0, 0]} /><Bar dataKey="recycled" name="Recycled (kg)" fill="#16A34A" radius={[5, 5, 0, 0]} /></BarChart> : <LineChart data={monthlyWaste} margin={{ top: 10, right: 10, left: -22, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={.7} /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><Tooltip contentStyle={tooltipStyle} /><Line type="monotone" dataKey="collected" name="Collected (kg)" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 3, fill: "#fff" }} /><Line type="monotone" dataKey="recycled" name="Recycled (kg)" stroke="#16A34A" strokeWidth={2.5} dot={{ r: 3, fill: "#fff" }} /></LineChart>}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function WasteDonutChart() {
+  return (
+    <div className="flex flex-col items-center gap-3 sm:flex-row" aria-label="Waste category distribution chart">
+      <div className="h-52 min-w-0 flex-1"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={wasteCategories} dataKey="value" nameKey="name" innerRadius={56} outerRadius={80} paddingAngle={3} stroke="none">{wasteCategories.map((entry) => <Cell key={entry.name} fill={entry.color} />)}</Pie><Tooltip contentStyle={tooltipStyle} /></PieChart></ResponsiveContainer></div>
+      <div className="grid min-w-32 grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-1">{wasteCategories.map(item => <div key={item.name} className="flex items-center gap-2 text-xs text-slate-500"><span className="size-2 rounded-full" style={{ background: item.color }} /><span>{item.name}</span><span className="ml-auto font-semibold text-slate-700 dark:text-slate-200">{item.value}%</span></div>)}</div>
+    </div>
+  );
+}
