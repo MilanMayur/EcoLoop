@@ -1,6 +1,15 @@
 import type { DashboardRole } from "@/types/dashboard";
 import type { AppNotification } from "@/types/mvp";
-import { serviceRequest } from "@/services/http.service";
+import { mockDelay, optionalSupabase, relativeTime, requireUser, throwDatabaseError } from "@/services/supabase.data";
+
+type NotificationRow = {
+  id: string;
+  role: DashboardRole;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+};
 
 let notifications: AppNotification[] = [
   { id: "NTF-101", role: "vendor", title: "Recycler assigned", message: "GreenCycle will arrive for ECO-2048 in approximately 18 minutes.", time: "8 min ago", read: false },
@@ -12,19 +21,48 @@ let notifications: AppNotification[] = [
 ];
 
 export const notificationService = {
-  getNotifications(role: DashboardRole) {
-    return serviceRequest(`/notifications?role=${role}`, { method: "GET" }, () => notifications.filter((item) => item.role === role).map((item) => ({ ...item })));
+  async getNotifications(role: DashboardRole) {
+    const supabase = optionalSupabase();
+    if (!supabase) { await mockDelay(); return notifications.filter((item) => item.role === role).map((item) => ({ ...item })); }
+    const user = await requireUser(supabase);
+    const { data, error } = await supabase.from("notifications")
+      .select("id, role, title, message, read, created_at")
+      .eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
+    throwDatabaseError(error, "Notifications could not be loaded.");
+    return (data as NotificationRow[]).map((row) => ({
+      id: row.id,
+      role: row.role,
+      title: row.title,
+      message: row.message,
+      time: relativeTime(row.created_at),
+      read: row.read,
+    }));
   },
-  markAsRead(id: string) {
-    return serviceRequest(`/notifications/${id}/read`, { method: "PATCH" }, () => {
+
+  async markAsRead(id: string) {
+    const supabase = optionalSupabase();
+    if (!supabase) {
+      await mockDelay();
       notifications = notifications.map((item) => item.id === id ? { ...item, read: true } : item);
       return { success: true as const, id };
-    });
+    }
+    const user = await requireUser(supabase);
+    const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id).eq("user_id", user.id);
+    throwDatabaseError(error, "The notification could not be updated.");
+    return { success: true as const, id };
   },
-  markAllAsRead(role: DashboardRole) {
-    return serviceRequest("/notifications/read-all", { method: "PATCH", body: { role } }, () => {
+
+  async markAllAsRead(role: DashboardRole) {
+    const supabase = optionalSupabase();
+    if (!supabase) {
+      await mockDelay();
       notifications = notifications.map((item) => item.role === role ? { ...item, read: true } : item);
       return { success: true as const };
-    });
+    }
+    const user = await requireUser(supabase);
+    const { error } = await supabase.from("notifications").update({ read: true })
+      .eq("user_id", user.id).eq("role", role).eq("read", false);
+    throwDatabaseError(error, "Notifications could not be updated.");
+    return { success: true as const };
   },
 };

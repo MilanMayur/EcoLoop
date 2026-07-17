@@ -1,26 +1,42 @@
-# 🌱 EcoLoop
+# EcoLoop
 
-### Smart Circular Waste Management Platform
+EcoLoop is a civic-tech circular-waste platform for vendors, authorised recycling partners, and BBMP operations.
 
-**Small Stock. Zero Waste. Smart Market.**
+## Architecture
 
-EcoLoop is a digital platform that connects vendors, BBMP, and authorised recycling partners to streamline waste segregation, pickup management, and recycling. By enabling source-level segregation and data-driven waste collection, EcoLoop promotes cleaner markets, reduces landfill waste, and supports a circular economy.
+- Next.js 16, React 19, TypeScript, and Tailwind CSS
+- Supabase Auth for signup, login, sessions, and email confirmation
+- Supabase Postgres queried directly from the browser
+- Row Level Security for vendor, recycler, and admin authorization
+- Postgres RPC functions for atomic or privileged actions
+- No n8n workflow server and no custom API gateway
 
-## Tech Stack
+The browser uses only the Supabase URL and publishable key. Never add a secret or service-role key to a `NEXT_PUBLIC_` environment variable.
 
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- n8n
-- Supabase
-- Vercel
+## Local setup
 
-## SDGs
+1. Copy `.env.example` to `.env.local` and add the project URL and publishable key.
+2. Run [`supabase/migrations/202607170001_ecoloop_frontend_backend.sql`](supabase/migrations/202607170001_ecoloop_frontend_backend.sql) in the Supabase SQL editor.
+3. In Supabase Auth, enable Email authentication and configure the application Site URL.
+4. Install dependencies with `pnpm install`.
+5. Start the application with `pnpm dev`.
 
-- 🌍 SDG 11 – Sustainable Cities & Communities
-- ♻️ SDG 12 – Responsible Consumption & Production
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+## First administrator
+
+Create the first BBMP account through signup, then approve it once from the Supabase SQL editor:
+
+```sql
+update public.profiles
+set role = 'admin', approval_status = 'approved', approved_at = now()
+where email = 'your-bbmp-email@example.com';
+```
+
+Later administrator approvals should use the `review_profile` database function supplied by the migration.
 
 ## Motto
 

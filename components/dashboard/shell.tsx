@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Bell, ChevronDown, HelpCircle, LogOut, Menu, Moon, Search, Sun, X } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -10,15 +10,25 @@ import { navigation, roleLabels, roleProfiles } from "@/data/dashboard";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/hooks/use-notifications";
 import type { DashboardRole } from "@/types/dashboard";
+import { authService } from "@/services/auth.service";
+import type { CurrentProfile } from "@/services/auth.service";
 
 export function DashboardShell({ role, children }: { role: DashboardRole; children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [dark, setDark] = useState(false);
-  const profile = roleProfiles[role];
+  const [account, setAccount] = useState<CurrentProfile | null>(null);
+  const fallbackProfile = roleProfiles[role];
+  const profile = account ? {
+    ...fallbackProfile,
+    name: account.name || fallbackProfile.name,
+    organization: account.organization || fallbackProfile.organization,
+    initials: (account.name || fallbackProfile.name).split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(),
+  } : fallbackProfile;
   const notifications = useNotifications(role);
   const searchResults = search.trim() ? navigation[role].filter((item) => item.label.toLowerCase().includes(search.trim().toLowerCase())) : [];
 
@@ -29,6 +39,23 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
     const frame = requestAnimationFrame(() => setDark(active));
     return () => cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    authService.getCurrentProfile().then((current) => {
+      if (!active || !current) return;
+      setAccount(current);
+      if (!current.isActive || current.approvalStatus !== "approved") router.replace("/login");
+      else if (current.role && current.role !== role) router.replace(`/dashboard/${current.role}`);
+    }).catch(() => { if (active) router.replace("/login"); });
+    return () => { active = false; };
+  }, [role, router]);
+
+  const logout = async () => {
+    await authService.logout();
+    router.replace("/login");
+    router.refresh();
+  };
 
   const toggleDark = () => {
     const next = !dark;
@@ -70,7 +97,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
             </div>
             <div className="relative ml-1">
               <button onClick={() => { setProfileOpen(!profileOpen); setNotificationOpen(false); }} className="flex items-center gap-2 rounded-xl p-1.5 pr-2 transition hover:bg-slate-50 dark:hover:bg-slate-900" aria-expanded={profileOpen}><span className="grid size-8 place-items-center rounded-lg bg-emerald-600 text-[10px] font-bold text-white">{profile.initials}</span><span className="hidden text-left md:block"><span className="block text-xs font-semibold text-slate-800 dark:text-white">{profile.name}</span><span className="block text-[9px] text-slate-400">{profile.shortRole}</span></span><ChevronDown className="hidden size-3.5 text-slate-400 md:block" /></button>
-              {profileOpen && <div className="absolute right-0 top-12 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"><div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800"><p className="text-xs font-semibold">{profile.name}</p><p className="mt-1 text-[10px] text-slate-400">{profile.organization}</p></div><p className="px-3 pt-3 text-[9px] font-bold uppercase tracking-wider text-slate-400">Preview as role</p>{(["vendor", "recycler", "admin"] as DashboardRole[]).map((item) => <Link key={item} href={`/dashboard/${item}`} className="mt-1 block rounded-lg px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800">{roleProfiles[item].shortRole}</Link>)}<Link href="/login" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"><LogOut className="size-3.5" /> Log out</Link></div>}
+              {profileOpen && <div className="absolute right-0 top-12 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900"><div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800"><p className="text-xs font-semibold">{profile.name}</p><p className="mt-1 text-[10px] text-slate-400">{profile.organization}</p></div><button type="button" onClick={logout} className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"><LogOut className="size-3.5" /> Log out</button></div>}
             </div>
           </div>
         </header>

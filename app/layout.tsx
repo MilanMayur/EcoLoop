@@ -12,5 +12,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" className="scroll-smooth"><body className={inter.variable}>{children}</body></html>;
+  return (
+    <html lang="en" className="scroll-smooth" data-scroll-behavior="smooth">
+      <body className={inter.variable} suppressHydrationWarning>
+        {children}
+      </body>
+    </html>
+  );
 }
