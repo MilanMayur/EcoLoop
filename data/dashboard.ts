@@ -1,6 +1,6 @@
 import {
   BarChart3, Building2, CircleUserRound, ClipboardList, FileBarChart, History,
-  LayoutDashboard, MapPinned, Recycle, Settings, Store, Truck, UsersRound,
+  LayoutDashboard, MapPinned, PackageOpen, Recycle, Settings, Store, Truck, UsersRound,
   Warehouse, Waypoints,
 } from "lucide-react";
 import type { DashboardRole, Metric, NavItem, RoleProfile } from "@/types/dashboard";
@@ -20,6 +20,7 @@ export const roleLabels: Record<DashboardRole, string> = {
 export const navigation: Record<DashboardRole, NavItem[]> = {
   vendor: [
     { label: "Dashboard", href: "/dashboard/vendor", icon: LayoutDashboard },
+    { label: "Smart Stock", href: "/dashboard/vendor/smart-stock", icon: PackageOpen },
     { label: "Request pickup", href: "/dashboard/vendor/request-pickup", icon: Truck },
     { label: "My requests", href: "/dashboard/vendor/requests", icon: ClipboardList },
     { label: "History", href: "/dashboard/vendor/history", icon: History },
@@ -85,17 +86,6 @@ export const marketStatus = [
   { market: "Bommanahalli Market", requests: 18, collected: "312 kg", rate: "71%", status: "Healthy" },
   { market: "Madiwala Market", requests: 16, collected: "264 kg", rate: "64%", status: "Attention" },
   { market: "Begur Market", requests: 11, collected: "186 kg", rate: "69%", status: "Healthy" },
-];
-
-export const monthlyWaste = [
-  { month: "Feb", collected: 420, recycled: 280 }, { month: "Mar", collected: 510, recycled: 360 },
-  { month: "Apr", collected: 460, recycled: 350 }, { month: "May", collected: 620, recycled: 470 },
-  { month: "Jun", collected: 710, recycled: 520 }, { month: "Jul", collected: 850, recycled: 612 },
-];
-
-export const wasteCategories = [
-  { name: "Wet", value: 46, color: "#16A34A" }, { name: "Dry", value: 24, color: "#3B82F6" },
-  { name: "Plastic", value: 18, color: "#8B5CF6" }, { name: "Metal", value: 12, color: "#F59E0B" },
 ];
 
 export const adminExtraMetrics = [
