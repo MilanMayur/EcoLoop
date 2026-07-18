@@ -22,13 +22,14 @@ export function PageHeader({ eyebrow, title, description, action }: { eyebrow?: 
 
 export function MetricCard({ metric, index = 0 }: { metric: Metric; index?: number }) {
   const tone = metric.tone ?? "green";
-  const up = !metric.change.startsWith("−");
+  const positive = metric.change.startsWith("+");
+  const negative = metric.change.startsWith("−") || metric.change.startsWith("-");
   return (
     <Reveal delay={index * .05} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,23,42,.07)] dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between"><span className={cn("grid size-10 place-items-center rounded-xl", tones[tone])}><metric.icon className="size-[18px]" /></span><MoreHorizontal className="size-4 text-slate-300 dark:text-slate-600" /></div>
       <p className="mt-6 text-2xl font-semibold tracking-[-.04em] text-slate-950 dark:text-white">{metric.value}</p><p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">{metric.label}</p>
-      <div className={cn("mt-4 flex items-center gap-1.5 text-[11px] font-medium", up ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500")}>
-        {up ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}{metric.change}
+      <div className={cn("mt-4 flex items-center gap-1.5 text-[11px] font-medium", positive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500")}>
+        {positive ? <ArrowUpRight className="size-3.5" /> : negative ? <ArrowDownRight className="size-3.5" /> : null}{metric.change}
       </div>
     </Reveal>
   );

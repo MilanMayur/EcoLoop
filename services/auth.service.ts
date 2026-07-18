@@ -16,6 +16,8 @@ export type ProfilePayload = {
   profileImageUrl?: string;
 };
 export type CurrentProfile = ProfilePayload & {
+  id: string;
+  officeId: string;
   role: DashboardRole | null;
   requestedRole: DashboardRole;
   approvalStatus: string;
@@ -88,12 +90,12 @@ export const authService = {
     const supabase = requireAuthClient();
     const user = await requireUser(supabase);
     let result = await supabase.from("profiles")
-      .select("email, full_name, organization_name, market, phone, profile_image_url, role, requested_role, approval_status, is_active, preferred_language")
+      .select("email, full_name, organization_name, market, phone, profile_image_url, registration_number, role, requested_role, approval_status, is_active, preferred_language")
       .eq("id", user.id).single();
 
     if (result.error?.message.includes("preferred_language") || result.error?.message.includes("profile_image_url") || result.error?.message.includes("market")) {
       result = await supabase.from("profiles")
-        .select("email, full_name, organization_name, phone, role, requested_role, approval_status, is_active")
+        .select("email, full_name, organization_name, phone, registration_number, role, requested_role, approval_status, is_active")
         .eq("id", user.id).single();
     }
 
@@ -103,10 +105,12 @@ export const authService = {
 
     const row = data as Record<string, unknown>;
     return {
+      id: user.id,
+      officeId: String(row.registration_number ?? user.user_metadata?.employeeId ?? ""),
       name: String(row.full_name ?? ""),
       organization: String(row.organization_name ?? ""),
       market: String(row.market ?? row.organization_name ?? ""),
-      email: String(row.email ?? user.email ?? ""),
+      email: String(user.email ?? row.email ?? ""),
       phone: String(row.phone ?? ""),
       profileImageUrl: typeof row.profile_image_url === "string" ? row.profile_image_url : undefined,
       role: isRole(row.role) ? row.role : null,
@@ -254,9 +258,15 @@ export const authService = {
   async updateProfile(payload: ProfilePayload) {
     const supabase = requireAuthClient();
     const user = await requireUser(supabase);
-    if (payload.email.trim() !== user.email) {
-      const { error } = await supabase.auth.updateUser({ email: payload.email.trim() });
+    const requestedEmail = payload.email.trim();
+    const emailChanged = requestedEmail.toLowerCase() !== String(user.email ?? "").toLowerCase();
+    let resolvedEmail = String(user.email ?? requestedEmail);
+    let emailChangePending = false;
+    if (emailChanged) {
+      const { data, error } = await supabase.auth.updateUser({ email: requestedEmail });
       if (error) throw new ServiceError(friendlyAuthError(error.message, "We couldn’t update your email."), error.status);
+      resolvedEmail = String(data.user.email ?? user.email ?? requestedEmail);
+      emailChangePending = resolvedEmail.toLowerCase() !== requestedEmail.toLowerCase();
     }
 
     const { error } = await supabase
@@ -271,7 +281,7 @@ export const authService = {
       })
       .eq("id", user.id);
     throwDatabaseError(error, "We couldn’t update your profile.");
-    return { success: true as const, profile: payload };
+    return { success: true as const, profile: { ...payload, email: emailChangePending ? requestedEmail : resolvedEmail }, emailChangePending };
   },
 
   async updatePreferredLanguage(preferredLanguage: Locale) {

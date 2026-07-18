@@ -8,8 +8,9 @@ const tooltipStyle = { borderRadius: 12, border: "1px solid #E2E8F0", boxShadow:
 
 export function WasteTrendChart({ mode = "bar" }: { mode?: "bar" | "line" }) {
   const { data, loading, error } = useAsyncResource(() => analyticsService.getCharts(), "dashboard-charts");
-  if (loading) return <ChartState label="Loading chart…" />;
+  if (loading) return <ChartState label="Loading chart…" loading />;
   if (error || !data) return <ChartState label="Chart data is unavailable." error />;
+  if (!data.wasteTrend.some((point) => point.collected > 0 || point.recycled > 0)) return <ChartState label="No measured pickup data yet." />;
   return (
     <div className="h-64 min-w-0 w-full" aria-label="Monthly waste collection and recycling chart">
       <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
@@ -21,8 +22,9 @@ export function WasteTrendChart({ mode = "bar" }: { mode?: "bar" | "line" }) {
 
 export function WasteDonutChart() {
   const { data, loading, error } = useAsyncResource(() => analyticsService.getCharts(), "dashboard-charts");
-  if (loading) return <ChartState label="Loading chart…" />;
+  if (loading) return <ChartState label="Loading chart…" loading />;
   if (error || !data) return <ChartState label="Chart data is unavailable." error />;
+  if (!data.wasteCategories.length) return <ChartState label="No measured material data yet." />;
   return (
     <div className="flex flex-col items-center gap-3 sm:flex-row" aria-label="Waste category distribution chart">
       <div className="h-52 w-full min-w-0 flex-1"><ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}><PieChart><Pie data={data.wasteCategories} dataKey="value" nameKey="name" innerRadius={56} outerRadius={80} paddingAngle={3} stroke="none">{data.wasteCategories.map((entry) => <Cell key={entry.name} fill={entry.color} />)}</Pie><Tooltip contentStyle={tooltipStyle} /></PieChart></ResponsiveContainer></div>
@@ -31,6 +33,6 @@ export function WasteDonutChart() {
   );
 }
 
-function ChartState({ label, error = false }: { label: string; error?: boolean }) {
-  return <div className={`grid h-64 place-items-center rounded-xl text-xs ${error ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10" : "animate-pulse bg-slate-50 text-slate-400 dark:bg-slate-800"}`}>{label}</div>;
+function ChartState({ label, error = false, loading = false }: { label: string; error?: boolean; loading?: boolean }) {
+  return <div className={`grid h-64 place-items-center rounded-xl text-xs ${error ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10" : loading ? "animate-pulse bg-slate-50 text-slate-400 dark:bg-slate-800" : "bg-slate-50 text-slate-500 dark:bg-slate-800"}`}>{label}</div>;
 }

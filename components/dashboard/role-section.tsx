@@ -46,13 +46,22 @@ type CompletionValues = z.output<typeof completionSchema>;
 
 const profileSchema = z.object({
   name: z.string().min(2, "Enter your full name."),
-  organization: z.string().min(2, "Enter an organization."),
+  organization: z.string(),
   market: z.string().min(2, "Enter your market or operating area."),
   email: z.string().email("Enter a valid email address."),
   phone: z.string().min(10, "Enter a valid phone number."),
 });
 
 type ProfileValues = z.infer<typeof profileSchema>;
+
+const adminSettingsSchema = z.object({
+  name: z.string().min(2, "Enter your full name."),
+  market: z.string().min(2, "Enter your zone or operating area."),
+  email: z.string().email("Enter a valid email address."),
+  phone: z.string().min(10, "Enter a valid phone number."),
+});
+
+type AdminSettingsValues = z.infer<typeof adminSettingsSchema>;
 
 const fillLevels: Array<{ value: FillLevel; height: string }> = [
   { value: "25%", height: "25%" },
@@ -269,7 +278,7 @@ function AdminSection({ section }: { section: string }) {
   if (section === "partners") return <PartnersPage />;
   if (section === "analytics") return <AnalyticsPage role="admin" />;
   if (section === "reports") return <ReportsPage />;
-  if (section === "settings") return <ProfilePage role="admin" settings />;
+  if (section === "settings") return <AdminSettingsPage />;
   return <UnknownSection />;
 }
 
@@ -277,46 +286,187 @@ function MarketsPage() {
   const resource = useAsyncResource(() => analyticsService.getMarkets(), "markets");
   const [search, setSearch] = useState("");
   const rows = (resource.data ?? []).filter((item) => includesSearch([item.market, item.ward], search));
-  return <div className="space-y-7"><PageHeader eyebrow="BBMP operations" title="Connected markets" description="Monitor collection volume, participation, and recycling performance by market." action={<Button disabled title="Coming Soon"><Plus className="size-4" /> Add market · Coming Soon</Button>} /><input aria-label="Search connected markets" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search market or ward…" className={`${inputClass} mt-0 max-w-xs`} />{resource.loading ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({length:6},(_,index)=><div key={index} className="h-56 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error ? <Panel><div className="p-8 text-center text-xs text-rose-600">{resource.error}</div></Panel> : rows.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{rows.map((item) => <Panel key={item.market}><div className="p-5"><div className="flex justify-between"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><Store className="size-[18px]" /></span><StatusBadge status={item.status} /></div><h2 className="mt-6 text-sm font-semibold">{item.market}</h2><p className="mt-1 text-[10px] text-slate-400">Ward {item.ward} · {item.vendors} active vendors</p><div className="mt-5 grid grid-cols-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-950">{[["Requests", item.requests], ["Collected", item.collected], ["Recycled", item.rate]].map(([k,v]) => <div key={k}><p className="text-[9px] uppercase text-slate-400">{k}</p><p className="mt-1 text-xs font-semibold">{v}</p></div>)}</div></div></Panel>)}</div> : <Panel><EmptyState icon={<Store className="size-5" />} title="No markets found" description="Try a different market name or ward." /></Panel>}</div>;
+  return <div className="space-y-7"><PageHeader eyebrow="BBMP operations" title="Connected markets" description="Monitor collection volume, participation, and recycling performance by market." /><input aria-label="Search connected markets" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search market or ward…" className={`${inputClass} mt-0 max-w-xs`} />{resource.loading ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({length:6},(_,index)=><div key={index} className="h-56 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error ? <Panel><div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div></Panel> : rows.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{rows.map((item) => <Panel key={item.market}><div className="p-5"><div className="flex justify-between"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><Store className="size-[18px]" /></span><StatusBadge status={item.status} /></div><h2 className="mt-6 text-sm font-semibold">{item.market}</h2><p className="mt-1 text-[10px] text-slate-400">Ward {item.ward} · {item.vendors} active vendors</p><div className="mt-5 grid grid-cols-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-950">{[["Requests", item.requests], ["Collected", item.collected], ["Recycled", item.rate]].map(([k,v]) => <div key={k}><p className="text-[9px] uppercase text-slate-400">{k}</p><p className="mt-1 text-xs font-semibold">{v}</p></div>)}</div></div></Panel>)}</div> : <Panel><EmptyState icon={<Store className="size-5" />} title="No connected markets" description="Markets will appear after they are added to Supabase and vendors are assigned." /></Panel>}</div>;
 }
 
 function AdminRequests() { return <RequestsPage history={false} admin />; }
 
 function PartnersPage() {
   const resource = useAsyncResource(() => analyticsService.getPartners(), "partners");
-  return <div className="space-y-7"><PageHeader eyebrow="BBMP operations" title="Recycling partners" description="Authorized collectors and facilities operating across your zone." action={<Button disabled title="Coming Soon"><Plus className="size-4" /> Invite partner · Coming Soon</Button>} />{resource.loading ? <div className="grid gap-4 lg:grid-cols-3">{Array.from({length:3},(_,index)=><div key={index} className="h-56 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error ? <Panel><div className="p-8 text-center text-xs text-rose-600">{resource.error}</div></Panel> : <div className="grid gap-4 lg:grid-cols-3">{resource.data?.map(p => <Panel key={p.name}><div className="p-5"><div className="flex justify-between"><span className="grid size-11 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><Recycle className="size-5" /></span><StatusBadge status="Active" /></div><h2 className="mt-6 text-sm font-semibold">{p.name}</h2><p className="mt-1 text-[10px] text-slate-400">{p.category}</p><div className="mt-5 grid grid-cols-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-950"><div><p className="text-[9px] text-slate-400">Trucks</p><p className="mt-1 text-xs font-semibold">{p.trucks}</p></div><div><p className="text-[9px] text-slate-400">Jobs</p><p className="mt-1 text-xs font-semibold">{p.jobs}</p></div><div><p className="text-[9px] text-slate-400">SLA</p><p className="mt-1 text-xs font-semibold">{p.rate}</p></div></div></div></Panel>)}</div>}</div>;
+  const partners = resource.data ?? [];
+  return <div className="space-y-7"><PageHeader eyebrow="BBMP operations" title="Recycling partners" description="Authorized collectors and facilities operating across your zone." />{resource.loading ? <div className="grid gap-4 lg:grid-cols-3">{Array.from({length:3},(_,index)=><div key={index} className="h-56 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error ? <Panel><div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div></Panel> : partners.length ? <div className="grid gap-4 lg:grid-cols-3">{partners.map(p => <Panel key={p.name}><div className="p-5"><div className="flex justify-between"><span className="grid size-11 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><Recycle className="size-5" /></span><StatusBadge status="Active" /></div><h2 className="mt-6 text-sm font-semibold">{p.name}</h2><p className="mt-1 text-[10px] text-slate-400">{p.category}</p><div className="mt-5 grid grid-cols-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-950"><div><p className="text-[9px] text-slate-400">Trucks</p><p className="mt-1 text-xs font-semibold">{p.trucks}</p></div><div><p className="text-[9px] text-slate-400">Jobs</p><p className="mt-1 text-xs font-semibold">{p.jobs}</p></div><div><p className="text-[9px] text-slate-400">SLA</p><p className="mt-1 text-xs font-semibold">{p.rate}</p></div></div></div></Panel>)}</div> : <Panel><EmptyState icon={<Recycle className="size-5" />} title="No approved recycling partners" description="Approved recycler accounts will appear here automatically." /></Panel>}</div>;
 }
 
 function AnalyticsPage({ role }: { role: DashboardRole }) {
   const resource = useAsyncResource(() => analyticsService.getDashboard(role), `analytics-${role}`);
-  return <div className="space-y-7"><PageHeader eyebrow={`${roleProfiles[role].shortRole} intelligence`} title="Analytics" description="Clear trends and measurable environmental outcomes from your EcoLoop activity." />{resource.loading ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({length:4},(_,index)=><div key={index} className="h-32 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error || !resource.data ? <Panel><div className="p-8 text-center text-xs text-rose-600">Analytics are temporarily unavailable.</div></Panel> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{resource.data.metrics.map((metric) => <div key={metric.label} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><p className="text-2xl font-semibold tracking-[-.04em]">{metric.value}</p><p className="mt-2 text-xs text-slate-500">{metric.label}</p><p className="mt-4 text-[10px] font-medium text-emerald-600">{metric.change}</p></div>)}</div>}<div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]"><Panel title="Monthly waste trend" subtitle="Collection and recovery volume"><div className="p-4 sm:p-6"><WasteTrendChart mode="line" /></div></Panel><Panel title="Material distribution" subtitle="Share by weight"><div className="p-4 sm:p-6"><WasteDonutChart /></div></Panel></div><Panel title={role === "admin" ? "Market comparison" : "Performance details"}><div className="p-4 sm:p-6"><WasteTrendChart /></div></Panel></div>;
+  return <div className="space-y-7"><PageHeader eyebrow={`${roleProfiles[role].shortRole} intelligence`} title="Analytics" description="Clear trends and measurable environmental outcomes from your EcoLoop activity." />{resource.loading ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({length:4},(_,index)=><div key={index} className="h-32 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error || !resource.data ? <Panel><div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error || "Analytics are temporarily unavailable."}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div></Panel> : <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{resource.data.metrics.map((metric) => <div key={metric.label} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><p className="text-2xl font-semibold tracking-[-.04em]">{metric.value}</p><p className="mt-2 text-xs text-slate-500">{metric.label}</p><p className="mt-4 text-[10px] font-medium text-emerald-600">{metric.change}</p></div>)}</div><div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]"><Panel title="Monthly waste trend" subtitle="Collection and recovery volume"><div className="p-4 sm:p-6"><WasteTrendChart mode="line" /></div></Panel><Panel title="Material distribution" subtitle="Share by weight"><div className="p-4 sm:p-6"><WasteDonutChart /></div></Panel></div><Panel title={role === "admin" ? "Market comparison" : "Performance details"}><div className="p-4 sm:p-6"><WasteTrendChart /></div></Panel></>}</div>;
 }
 
 function ReportsPage() {
   const [toast, setToast] = useState("");
   const [generating, setGenerating] = useState("");
-  const generate = async (format: "PDF" | "CSV" | "dashboard") => { setGenerating(format); try { const result = await analyticsService.generateReport(format); setToast(`${result.filename} is ready to export.`); } catch (reason) { setToast(reason instanceof Error ? reason.message : "The report could not be generated."); } finally { setGenerating(""); } };
-  return <div className="space-y-7"><PageHeader eyebrow="BBMP intelligence" title="Reports" description="Create presentation-ready operational and environmental reports." action={<Button disabled={Boolean(generating)} onClick={() => generate("dashboard")}><FileBarChart className="size-4" /> {generating === "dashboard" ? "Generating…" : "Generate report"}</Button>} /><div className="grid gap-4 md:grid-cols-3">{[{ t: "Monthly circularity report", d: "Collection, recovery, and SDG outcomes", icon: Recycle }, { t: "Market performance report", d: "SLA and participation by market", icon: Store }, { t: "Partner compliance report", d: "Recycler activity and proof records", icon: ShieldCheck }].map(item => <Panel key={item.t}><div className="p-5"><span className="grid size-11 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><item.icon className="size-5" /></span><h2 className="mt-6 text-sm font-semibold">{item.t}</h2><p className="mt-2 text-xs leading-5 text-slate-500">{item.d}</p><div className="mt-6 flex gap-2"><Button size="sm" variant="outline" disabled={Boolean(generating)} onClick={() => generate("PDF")}><Download className="size-3.5" /> PDF</Button><Button size="sm" variant="outline" disabled={Boolean(generating)} onClick={() => generate("CSV")}><Download className="size-3.5" /> CSV</Button></div></div></Panel>)}</div><Panel title="Recent reports"><div className="divide-y divide-slate-100 dark:divide-slate-800">{["June 2026 Circularity Report", "Q2 Market Performance", "Recycler Compliance · June"].map((r,i) => <div key={r} className="flex items-center gap-3 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800"><FileBarChart className="size-4 text-slate-500" /></span><div className="flex-1"><p className="text-xs font-semibold">{r}</p><p className="mt-1 text-[10px] text-slate-400">Generated {8+i*3} July 2026 · PDF</p></div><Button size="sm" variant="ghost" aria-label={`Download ${r}`} disabled={Boolean(generating)} onClick={() => generate("PDF")}><Download className="size-4" /></Button></div>)}</div></Panel>{toast && <Toast message={toast} onClose={() => setToast("")} />}</div>;
+  const [reports, setReports] = useState<Array<{ filename: string; title: string; format: string; createdAt: string; blob: Blob }>>([]);
+  const download = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const generate = async (format: "PDF" | "CSV" | "dashboard", title: string) => {
+    const key = `${title}-${format}`;
+    setGenerating(key);
+    try {
+      const result = await analyticsService.generateReport(format, title);
+      download(result.blob, result.filename);
+      setReports((current) => [{ filename: result.filename, title, format: format === "CSV" ? "CSV" : "PDF", createdAt: new Date().toLocaleString("en-IN"), blob: result.blob }, ...current]);
+      setToast(`${result.filename} downloaded.`);
+    } catch (reason) {
+      setToast(reason instanceof Error ? reason.message : "The report could not be generated.");
+    } finally {
+      setGenerating("");
+    }
+  };
+  const reportTypes = [
+    { title: "Monthly circularity report", description: "Collection, recovery, and SDG outcomes", icon: Recycle },
+    { title: "Market performance report", description: "SLA and participation by market", icon: Store },
+    { title: "Partner compliance report", description: "Recycler activity and proof records", icon: ShieldCheck },
+  ];
+  return <div className="space-y-7"><PageHeader eyebrow="BBMP intelligence" title="Reports" description="Create presentation-ready operational and environmental reports." action={<Button disabled={Boolean(generating)} onClick={() => generate("dashboard", "EcoLoop dashboard report")}><FileBarChart className="size-4" /> {generating ? "Generating…" : "Generate report"}</Button>} /><div className="grid gap-4 md:grid-cols-3">{reportTypes.map(item => <Panel key={item.title}><div className="p-5"><span className="grid size-11 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><item.icon className="size-5" /></span><h2 className="mt-6 text-sm font-semibold">{item.title}</h2><p className="mt-2 text-xs leading-5 text-slate-500">{item.description}</p><div className="mt-6 flex gap-2"><Button size="sm" variant="outline" disabled={Boolean(generating)} onClick={() => generate("PDF", item.title)}><Download className="size-3.5" /> PDF</Button><Button size="sm" variant="outline" disabled={Boolean(generating)} onClick={() => generate("CSV", item.title)}><Download className="size-3.5" /> CSV</Button></div></div></Panel>)}</div><Panel title="Generated this session">{reports.length ? <div className="divide-y divide-slate-100 dark:divide-slate-800">{reports.map((report, index) => <div key={`${report.filename}-${index}`} className="flex items-center gap-3 px-5 py-4"><span className="grid size-9 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800"><FileBarChart className="size-4 text-slate-500" /></span><div className="flex-1"><p className="text-xs font-semibold">{report.title}</p><p className="mt-1 text-[10px] text-slate-400">Generated {report.createdAt} · {report.format}</p></div><Button size="sm" variant="ghost" aria-label={`Download ${report.title}`} onClick={() => download(report.blob, report.filename)}><Download className="size-4" /></Button></div>)}</div> : <EmptyState icon={<FileBarChart className="size-5" />} title="No reports generated yet" description="Choose PDF or CSV above to create a report from live Supabase data." />}</Panel>{toast && <Toast message={toast} onClose={() => setToast("")} />}</div>;
 }
 
-function ProfilePage({ role, settings = false }: { role: DashboardRole; settings?: boolean }) {
-  const profile = roleProfiles[role];
+function AdminSettingsPage() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [current, setCurrent] = useState<Awaited<ReturnType<typeof authService.getCurrentProfile>> | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState("");
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProfileValues>({ resolver: zodResolver(profileSchema), defaultValues: { name: profile.name, organization: profile.organization, market: profile.organization, email: `${profile.name.toLowerCase().replace(" ", ".")}@ecoloop.city`, phone: "+91 98765 43210" } });
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<AdminSettingsValues>({
+    resolver: zodResolver(adminSettingsSchema),
+    defaultValues: { name: "", market: "", email: "", phone: "" },
+  });
+
+  useEffect(() => {
+    let active = true;
+    authService.getCurrentProfile().then((profile) => {
+      if (!active) return;
+      setCurrent(profile);
+      reset({ name: profile.name, market: profile.market, email: profile.email, phone: profile.phone });
+    }).catch((reason) => {
+      if (active) setError(reason instanceof Error ? reason.message : "Your profile could not be loaded.");
+    }).finally(() => {
+      if (active) setLoadingProfile(false);
+    });
+    return () => { active = false; };
+  }, [reset]);
+
+  useEffect(() => () => {
+    if (profileImagePreview) URL.revokeObjectURL(profileImagePreview);
+  }, [profileImagePreview]);
+
+  const selectProfileImage = (file?: File) => {
+    setError("");
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Use a JPG, PNG, or WEBP profile image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("The profile image must be 5 MB or smaller.");
+      return;
+    }
+    setProfileImage(file);
+    setProfileImagePreview(URL.createObjectURL(file));
+  };
+
+  const submit = async (values: AdminSettingsValues) => {
+    if (!current) return;
+    setError("");
+    try {
+      const profileImageUrl = profileImage ? await authService.uploadProfileImage(profileImage) : current.profileImageUrl;
+      const result = await authService.updateProfile({
+        ...values,
+        organization: current.organization,
+        profileImageUrl,
+      });
+      setCurrent((profile) => profile ? { ...profile, ...result.profile } : profile);
+      setProfileImage(null);
+      setToast(result.emailChangePending ? "Check your inbox to confirm the new email address." : "Your settings have been saved.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Your settings could not be saved.");
+    }
+  };
+
+  if (loadingProfile) return <div className="space-y-7"><PageHeader eyebrow="Workspace administration" title="Settings" description="Manage account details, notification preferences, and security." /><div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]"><div className="h-64 animate-pulse rounded-2xl bg-white dark:bg-slate-900" /><div className="h-80 animate-pulse rounded-2xl bg-white dark:bg-slate-900" /></div></div>;
+
+  const displayName = current?.name || "BBMP account";
+  const imageUrl = profileImagePreview || current?.profileImageUrl;
+  const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "BA";
+
+  return (
+    <div className="space-y-7">
+      <PageHeader eyebrow="Workspace administration" title="Settings" description="Manage account details, notification preferences, and security." />
+      <form onSubmit={handleSubmit(submit)} className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]" noValidate>
+        <Panel>
+          <div className="p-6 text-center">
+            {imageUrl ? <Image src={imageUrl} alt={`${displayName} profile`} width={80} height={80} unoptimized className="mx-auto size-20 rounded-2xl object-cover" /> : <span className="mx-auto grid size-20 place-items-center rounded-2xl bg-emerald-600 text-xl font-bold text-white">{initials}</span>}
+            <h2 className="mt-4 text-sm font-semibold">{displayName}</h2>
+            <p className="mt-1 text-xs text-slate-500">{current?.market || "BBMP administrator"}</p>
+            <StatusBadge status="Active" />
+            <label className="mx-auto mt-4 flex w-fit cursor-pointer items-center gap-2 text-[10px] font-semibold text-emerald-600"><Upload className="size-3.5" /> Upload profile image<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => selectProfileImage(event.target.files?.[0])} /></label>
+            <p className="mt-1 text-[9px] text-slate-400">JPG, PNG, or WEBP · maximum 5 MB</p>
+          </div>
+        </Panel>
+        <div className="space-y-5">
+          <Panel title="Profile details">
+            <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+              <label className={labelClass}>Full name<input {...register("name")} className={inputClass} />{errors.name && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.name.message}</span>}</label>
+              <label className={labelClass}>Employee ID<input value={current?.officeId || "Not provided during signup"} readOnly aria-readonly="true" className={`${inputClass} cursor-not-allowed bg-slate-50 text-slate-500 dark:bg-slate-900`} /></label>
+              <label className={labelClass}>Zone or operating area<input {...register("market")} className={inputClass} />{errors.market && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.market.message}</span>}</label>
+              <label className={labelClass}>Phone<input {...register("phone")} className={inputClass} />{errors.phone && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.phone.message}</span>}</label>
+              <label className={labelClass}>Email<input {...register("email")} type="email" className={inputClass} />{errors.email && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.email.message}</span>}</label>
+            </div>
+          </Panel>
+          <Panel title="Security"><div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6"><span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10"><KeyRound className="size-[18px]" /></span><div className="flex-1"><p className="text-xs font-semibold">Password</p><p className="mt-1 text-[10px] text-slate-400">Use the login page if you need to reset your password.</p></div><Button type="button" size="sm" variant="outline" asChild><Link href="/login">Reset password</Link></Button></div></Panel>
+          {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
+          <Button type="submit" disabled={isSubmitting || !current}><Save className="size-4" /> {isSubmitting ? "Saving…" : "Save changes"}</Button>
+        </div>
+      </form>
+      {toast && <Toast message={toast} onClose={() => setToast("")} />}
+    </div>
+  );
+}
+
+function ProfilePage({ role, settings = false }: { role: DashboardRole; settings?: boolean }) {
+  const [toast, setToast] = useState("");
+  const [error, setError] = useState("");
+  const [current, setCurrent] = useState<Awaited<ReturnType<typeof authService.getCurrentProfile>> | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState("");
+  const { register: formRegister, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProfileValues>({ resolver: zodResolver(profileSchema), defaultValues: { name: "", organization: "", market: "", email: "", phone: "" } });
+  const register = (name: keyof ProfileValues) => {
+    const registration = formRegister(name);
+    return role === "admin" && name === "organization" ? { ...registration, readOnly: true, "aria-label": "Account ID" } : registration;
+  };
   useEffect(() => {
     let active = true;
     authService.getCurrentProfile().then((current) => {
       if (active) {
         setCurrent(current);
-        reset({ name: current.name, organization: current.organization, market: current.market, email: current.email, phone: current.phone });
+        reset({ name: current.name, organization: role === "admin" ? `Account ID: ${current.id}` : current.organization, market: current.market, email: current.email, phone: current.phone });
       }
-    }).catch(() => undefined);
+    }).catch((reason) => {
+      if (active) setError(reason instanceof Error ? reason.message : "Your profile could not be loaded.");
+    }).finally(() => {
+      if (active) setLoadingProfile(false);
+    });
     return () => { active = false; };
-  }, [reset]);
+  }, [reset, role]);
   useEffect(() => () => { if (profileImagePreview) URL.revokeObjectURL(profileImagePreview); }, [profileImagePreview]);
   const selectProfileImage = (file?: File) => {
     setError("");
@@ -330,16 +480,17 @@ function ProfilePage({ role, settings = false }: { role: DashboardRole; settings
     setError("");
     try {
       const profileImageUrl = profileImage ? await authService.uploadProfileImage(profileImage) : current?.profileImageUrl;
-      const result = await authService.updateProfile({ ...values, profileImageUrl });
+      const result = await authService.updateProfile({ ...values, organization: role === "admin" ? current?.organization ?? "" : values.organization, profileImageUrl });
       setCurrent((existing) => existing ? { ...existing, ...result.profile } : existing);
       setProfileImage(null);
-      setToast("Your settings have been saved.");
+      setToast(result.emailChangePending ? "Check your inbox to confirm the new email address." : "Your settings have been saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Your settings could not be saved.");
     }
   };
-  const displayName = current?.name || profile.name;
-  const displayOrganization = current?.organization || profile.organization;
+  if (loadingProfile) return <div className="space-y-7"><PageHeader eyebrow={settings ? "Workspace administration" : "Account"} title={settings ? "Settings" : "Profile"} description="Manage account details, notification preferences, and security." /><div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]"><div className="h-64 animate-pulse rounded-2xl bg-white dark:bg-slate-900" /><div className="h-80 animate-pulse rounded-2xl bg-white dark:bg-slate-900" /></div></div>;
+  const displayName = current?.name || "EcoLoop account";
+  const displayOrganization = role === "admin" ? current?.market || "BBMP administrator" : current?.organization || current?.market || roleProfiles[role].shortRole;
   const imageUrl = profileImagePreview || current?.profileImageUrl;
   return <div className="space-y-7"><PageHeader eyebrow={settings ? "Workspace administration" : "Account"} title={settings ? "Settings" : "Profile"} description="Manage account details, notification preferences, and security." /><form onSubmit={handleSubmit(submit)} className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]" noValidate><Panel><div className="p-6 text-center">{imageUrl ? <Image src={imageUrl} alt={`${displayName} profile`} width={80} height={80} unoptimized className="mx-auto size-20 rounded-2xl object-cover" /> : <span className="mx-auto grid size-20 place-items-center rounded-2xl bg-emerald-600 text-xl font-bold text-white">{displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>}<h2 className="mt-4 text-sm font-semibold">{displayName}</h2><p className="mt-1 text-xs text-slate-500">{displayOrganization}</p><StatusBadge status="Active" /><label className="mx-auto mt-4 flex w-fit cursor-pointer items-center gap-2 text-[10px] font-semibold text-emerald-600"><Upload className="size-3.5" /> Upload profile image<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => selectProfileImage(event.target.files?.[0])} /></label><p className="mt-1 text-[9px] text-slate-400">JPG, PNG, or WEBP · maximum 5 MB</p></div></Panel><div className="space-y-5"><Panel title="Profile details"><div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6"><label className={labelClass}>Full name<input {...register("name")} className={inputClass} />{errors.name && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.name.message}</span>}</label><label className={labelClass}>Organization<input {...register("organization")} className={inputClass} />{errors.organization && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.organization.message}</span>}</label><label className={labelClass}>Market or operating area<input {...register("market")} className={inputClass} />{errors.market && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.market.message}</span>}</label><label className={labelClass}>Phone<input {...register("phone")} className={inputClass} />{errors.phone && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.phone.message}</span>}</label><label className={labelClass}>Email<input {...register("email")} type="email" className={inputClass} />{errors.email && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.email.message}</span>}</label></div></Panel><Panel title="Notifications"><div className="divide-y divide-slate-100 px-5 dark:divide-slate-800 sm:px-6">{[{ i: Bell, t: "Pickup updates", d: "Status, recycler assignment, and ETA changes" }, { i: FileBarChart, t: "Weekly summaries", d: "Performance and impact digest every Monday" }].map((item,i) => <label key={item.t} className="flex cursor-pointer items-center gap-3 py-4"><span className="grid size-9 place-items-center rounded-xl bg-slate-100 dark:bg-slate-800"><item.i className="size-4" /></span><span className="flex-1"><span className="block text-xs font-semibold">{item.t}</span><span className="mt-1 block text-[10px] text-slate-400">{item.d}</span></span><input type="checkbox" defaultChecked={i === 0} className="size-4 accent-emerald-600" /></label>)}</div></Panel><Panel title="Security"><div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6"><span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10"><KeyRound className="size-[18px]" /></span><div className="flex-1"><p className="text-xs font-semibold">Password</p><p className="mt-1 text-[10px] text-slate-400">Use the login page if you need to reset your password.</p></div><Button type="button" size="sm" variant="outline" asChild><Link href="/login">Reset password</Link></Button></div></Panel>{error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}<Button type="submit" disabled={isSubmitting}><Save className="size-4" /> {isSubmitting ? "Saving…" : "Save changes"}</Button></div></form>{toast && <Toast message={toast} onClose={() => setToast("")} />}</div>;
 }

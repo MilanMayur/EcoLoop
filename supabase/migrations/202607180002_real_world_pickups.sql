@@ -7,19 +7,47 @@ alter table public.pickup_requests
   add column if not exists completion_image_url text,
   add column if not exists completion_notes text;
 
-update public.pickup_requests
-set fill_level = case
-  when estimated_weight <= 15 then '25%'
-  when estimated_weight <= 30 then '50%'
-  when estimated_weight <= 50 then '75%'
-  when estimated_weight <= 75 then '100% (Full)'
-  else 'Overflowing'
-end
-where fill_level is null;
+-- Backfill legacy rows only when the old columns still exist. Keeping this in a
+-- conditional block makes the migration safe to run again after a partial setup.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'pickup_requests'
+      and column_name = 'estimated_weight'
+  ) then
+    execute $sql$
+      update public.pickup_requests
+      set fill_level = case
+        when estimated_weight <= 15 then '25%'
+        when estimated_weight <= 30 then '50%'
+        when estimated_weight <= 50 then '75%'
+        when estimated_weight <= 75 then '100% (Full)'
+        else 'Overflowing'
+      end
+      where fill_level is null
+    $sql$;
+  else
+    update public.pickup_requests
+    set fill_level = '50%'
+    where fill_level is null;
+  end if;
 
-update public.pickup_requests
-set actual_weight = collected_weight
-where actual_weight is null and collected_weight is not null;
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'pickup_requests'
+      and column_name = 'collected_weight'
+  ) then
+    execute $sql$
+      update public.pickup_requests
+      set actual_weight = collected_weight
+      where actual_weight is null and collected_weight is not null
+    $sql$;
+  end if;
+end
+$$;
 
 alter table public.pickup_requests
   alter column fill_level set not null,
@@ -37,6 +65,7 @@ alter table public.pickup_requests
   drop column if exists collected_weight;
 
 drop function if exists public.update_pickup_status(uuid, public.pickup_status, numeric, text, text);
+drop function if exists public.update_pickup_status(uuid, public.pickup_status, numeric, text, text, text);
 
 create function public.update_pickup_status(
   p_pickup_id uuid,

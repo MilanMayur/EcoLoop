@@ -1,4 +1,3 @@
-import { availableJobs, vendorRequests } from "@/data/dashboard";
 import type {
   FillLevel,
   PickupCompletionInput,
@@ -6,10 +5,9 @@ import type {
   PickupJob,
   PickupRequest,
   PickupTimelineItem,
-  VehicleSummary,
 } from "@/types/mvp";
 import { ServiceError } from "@/services/service-error";
-import { mockDelay, optionalSupabase, relativeTime, requireUser, throwDatabaseError } from "@/services/supabase.data";
+import { optionalSupabase, relativeTime, requireUser, throwDatabaseError } from "@/services/supabase.data";
 
 const PICKUP_IMAGE_BUCKET = "pickup-images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -50,18 +48,11 @@ type VehicleRow = {
   status: string;
 };
 
-let requestStore: PickupRequest[] = vendorRequests.map((item) => ({ ...item, weight: item.fillLevel }));
-let availableStore: PickupJob[] = availableJobs.map((item) => ({ ...item, weight: item.fillLevel, status: "Available" }));
-let acceptedStore: PickupJob[] = [
-  { ...availableJobs[0], status: "In transit" },
-  { ...availableJobs[1], status: "Accepted" },
-];
-
-const vehicleStore: VehicleSummary[] = [
-  { id: "KA-51-AB-4821", driver: "Suresh Kumar", capacity: "1.2 t", load: "68%", status: "Active" },
-  { id: "KA-05-MN-9204", driver: "Imran Pasha", capacity: "850 kg", load: "42%", status: "Active" },
-  { id: "KA-51-HG-1178", driver: "Manoj R", capacity: "1.5 t", load: "—", status: "Maintenance" },
-];
+const requirePickupClient = () => {
+  const supabase = optionalSupabase();
+  if (!supabase) throw new ServiceError("Supabase is not configured. Pickup data cannot be loaded.", 503);
+  return supabase;
+};
 
 const statusLabel = (status: PickupStatus) => ({
   pending: "Pending",
@@ -115,8 +106,7 @@ const jobFromRow = (row: PickupRow): PickupJob => ({
 const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, recycler_id, created_at";
 
 const pickupId = async (referenceCode: string) => {
-  const supabase = optionalSupabase();
-  if (!supabase) return referenceCode;
+  const supabase = requirePickupClient();
   const { data, error } = await supabase.from("pickup_requests").select("id").eq("reference_code", referenceCode).single();
   throwDatabaseError(error, "Pickup job not found.");
   if (!data) throw new ServiceError("Pickup job not found.", 404);
@@ -127,8 +117,7 @@ export const pickupService = {
   async uploadPickupImage(file: File, purpose: "pickup" | "completion" = "pickup") {
     if (!IMAGE_TYPES.includes(file.type)) throw new ServiceError("Use a JPG, PNG, or WEBP image.", 400);
     if (file.size > MAX_IMAGE_SIZE) throw new ServiceError("The image must be 5 MB or smaller.", 400);
-    const supabase = optionalSupabase();
-    if (!supabase) return URL.createObjectURL(file);
+    const supabase = requirePickupClient();
     const user = await requireUser(supabase);
     const extension = file.name.split(".").pop()?.toLowerCase() || file.type.split("/")[1] || "jpg";
     const path = `${user.id}/${purpose}/${crypto.randomUUID()}.${extension}`;
@@ -143,8 +132,7 @@ export const pickupService = {
   },
 
   async getRequests() {
-    const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return requestStore.map((item) => ({ ...item })); }
+    const supabase = requirePickupClient();
     await requireUser(supabase);
     const { data, error } = await supabase.from("pickup_requests").select(pickupSelect).order("created_at", { ascending: false });
     throwDatabaseError(error, "Pickup requests could not be loaded.");
@@ -161,26 +149,7 @@ export const pickupService = {
   },
 
   async createPickup(payload: PickupInput) {
-    const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      const request: PickupRequest = {
-        id: `ECO-${2058 + requestStore.length}`,
-        waste: `${payload.wasteType} waste`,
-        fillLevel: payload.fillLevel,
-        weight: payload.fillLevel,
-        imageUrl: payload.imageUrl,
-        notes: payload.notes,
-        recycler: "Matching in progress",
-        status: "Pending",
-        time: "Today, just now",
-        eta: "—",
-        timeline: [{ status: "Created", time: "just now" }],
-      };
-      requestStore = [request, ...requestStore];
-      return request;
-    }
-
+    const supabase = requirePickupClient();
     const user = await requireUser(supabase);
     const { data: profile, error: profileError } = await supabase.from("profiles")
       .select("full_name, organization_name, market_id").eq("id", user.id).single();
@@ -203,8 +172,7 @@ export const pickupService = {
   },
 
   async getAvailableJobs() {
-    const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return availableStore.map((item) => ({ ...item })); }
+    const supabase = requirePickupClient();
     await requireUser(supabase);
     const { data, error } = await supabase.from("pickup_requests").select(pickupSelect).eq("status", "pending").order("created_at");
     throwDatabaseError(error, "Available pickups could not be loaded.");
@@ -212,8 +180,7 @@ export const pickupService = {
   },
 
   async getAcceptedJobs() {
-    const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return acceptedStore.map((item) => ({ ...item })); }
+    const supabase = requirePickupClient();
     const user = await requireUser(supabase);
     const { data, error } = await supabase.from("pickup_requests").select(pickupSelect)
       .eq("recycler_id", user.id).in("status", ["accepted", "in_transit"]).order("accepted_at", { ascending: false });
@@ -222,16 +189,7 @@ export const pickupService = {
   },
 
   async acceptPickup(referenceCode: string) {
-    const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      const job = availableStore.find((item) => item.id === referenceCode);
-      if (!job) throw new ServiceError("This pickup is no longer available.", 404);
-      const accepted: PickupJob = { ...job, status: "Accepted" };
-      availableStore = availableStore.filter((item) => item.id !== referenceCode);
-      acceptedStore = [accepted, ...acceptedStore.filter((item) => item.id !== referenceCode)];
-      return accepted;
-    }
+    const supabase = requirePickupClient();
     await requireUser(supabase);
     const id = await pickupId(referenceCode);
     const { data, error } = await supabase.rpc("accept_pickup", { p_pickup_id: id });
@@ -240,15 +198,7 @@ export const pickupService = {
   },
 
   async startPickup(referenceCode: string) {
-    const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      const job = acceptedStore.find((item) => item.id === referenceCode);
-      if (!job) throw new ServiceError("Pickup job not found.", 404);
-      const updated: PickupJob = { ...job, status: "In transit" };
-      acceptedStore = acceptedStore.map((item) => item.id === referenceCode ? updated : item);
-      return updated;
-    }
+    const supabase = requirePickupClient();
     await requireUser(supabase);
     const id = await pickupId(referenceCode);
     const { data, error } = await supabase.rpc("update_pickup_status", { p_pickup_id: id, p_status: "in_transit" });
@@ -257,15 +207,7 @@ export const pickupService = {
   },
 
   async completePickup(referenceCode: string, payload: PickupCompletionInput) {
-    const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      const job = acceptedStore.find((item) => item.id === referenceCode);
-      if (!job) throw new ServiceError("Pickup job not found.", 404);
-      const completed: PickupJob = { ...job, status: "Completed", actualWeight: payload.actualWeight, facility: payload.facility, completionImageUrl: payload.completionImageUrl };
-      acceptedStore = acceptedStore.map((item) => item.id === referenceCode ? completed : item);
-      return completed;
-    }
+    const supabase = requirePickupClient();
     await requireUser(supabase);
     const id = await pickupId(referenceCode);
     const { data, error } = await supabase.rpc("update_pickup_status", {
@@ -281,11 +223,7 @@ export const pickupService = {
   },
 
   async getHistory() {
-    const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      return acceptedStore.filter((item) => item.status === "Completed").concat(availableJobs.map((item) => ({ ...item, status: "Completed" as const, actualWeight: 42 })));
-    }
+    const supabase = requirePickupClient();
     await requireUser(supabase);
     const { data, error } = await supabase.from("pickup_requests").select(pickupSelect).eq("status", "completed").order("completed_at", { ascending: false });
     throwDatabaseError(error, "Pickup history could not be loaded.");
@@ -293,8 +231,7 @@ export const pickupService = {
   },
 
   async getVehicles() {
-    const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return vehicleStore.map((item) => ({ ...item })); }
+    const supabase = requirePickupClient();
     await requireUser(supabase);
     const { data, error } = await supabase.from("vehicles").select("id, driver, capacity_kg, load_percent, status").order("id");
     throwDatabaseError(error, "Vehicle data could not be loaded.");

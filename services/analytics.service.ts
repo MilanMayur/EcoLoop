@@ -1,8 +1,9 @@
-import { adminExtraMetrics, availableJobs, marketStatus, metrics, vendorRequests } from "@/data/dashboard";
+import { adminExtraMetrics, metrics } from "@/data/dashboard";
 import { stockProducts } from "@/data/smart-stock";
 import type { DashboardRole } from "@/types/dashboard";
-import type { DashboardAnalytics, MarketSummary, PickupJob, PickupRequest, RecyclerPartner, SmartStockAnalytics, WasteCategoryPoint, WasteTrendPoint } from "@/types/mvp";
+import type { DashboardAnalytics, PickupJob, PickupRequest, SmartStockAnalytics, WasteCategoryPoint, WasteTrendPoint } from "@/types/mvp";
 import { mockDelay, optionalSupabase, relativeTime, requireUser, throwDatabaseError } from "@/services/supabase.data";
+import { ServiceError } from "@/services/service-error";
 
 type AnalyticsPickup = {
   id: string;
@@ -29,17 +30,6 @@ type RecoveryRow = {
   recovered_weight: number | string;
 };
 
-const fallbackWasteTrend = [
-  { month: "Feb", collected: 420, recycled: 280 }, { month: "Mar", collected: 510, recycled: 360 },
-  { month: "Apr", collected: 460, recycled: 350 }, { month: "May", collected: 620, recycled: 470 },
-  { month: "Jun", collected: 710, recycled: 520 }, { month: "Jul", collected: 850, recycled: 612 },
-];
-
-const fallbackWasteCategories = [
-  { name: "Wet", value: 46, color: "#16A34A" }, { name: "Dry", value: 24, color: "#3B82F6" },
-  { name: "Plastic", value: 18, color: "#8B5CF6" }, { name: "Metal", value: 12, color: "#F59E0B" },
-];
-
 const fallbackInventoryDemand = [
   { day: "Mon", inventory: 132, demand: 118 }, { day: "Tue", inventory: 148, demand: 126 },
   { day: "Wed", inventory: 139, demand: 122 }, { day: "Thu", inventory: 158, demand: 131 },
@@ -54,17 +44,6 @@ const fallbackMonthlyImpact = [
   { month: "May", waste: 61, prevented: 96, savings: 14900, accuracy: 91 },
   { month: "Jun", waste: 54, prevented: 112, savings: 16800, accuracy: 93 },
   { month: "Jul", waste: 47, prevented: 138, savings: 18400, accuracy: 94 },
-];
-
-const fallbackMarkets: MarketSummary[] = marketStatus.concat([
-  { market: "Singasandra Market", requests: 9, collected: "142 kg", rate: "67%", status: "Healthy" },
-  { market: "Electronic City Market", requests: 14, collected: "218 kg", rate: "74%", status: "Healthy" },
-]).map((item, index) => ({ ...item, ward: 187 + index, vendors: 42 - index * 3 }));
-
-const fallbackPartners: RecyclerPartner[] = [
-  { name: "GreenCycle Pvt Ltd", category: "Wet, dry, plastic", trucks: 6, jobs: 128, rate: "98%" },
-  { name: "ReForm India", category: "Plastic, packaging", trucks: 4, jobs: 84, rate: "96%" },
-  { name: "EcoMetals Co.", category: "Metal, e-waste", trucks: 3, jobs: 61, rate: "94%" },
 ];
 
 const colors = ["#16A34A", "#3B82F6", "#8B5CF6", "#F59E0B", "#0F766E"];
@@ -132,12 +111,46 @@ const chartsFromRows = (rows: AnalyticsPickup[]) => {
 
 const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, image_url, completion_image_url, facility, notes, priority, status, recycler_id, market_id, created_at, completed_at";
 
+type ReportFormat = "PDF" | "CSV" | "dashboard";
+
+const reportSlug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "ecoloop-report";
+const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+const pdfText = (value: string | number) => String(value)
+  .normalize("NFKD")
+  .replace(/[^\x20-\x7E]/g, "")
+  .replace(/([\\()])/g, "\\$1");
+
+const createPdf = (lines: string[]) => {
+  const content = lines.slice(0, 31).map((line, index) => {
+    const fontSize = index === 0 ? 18 : index === 1 ? 10 : 11;
+    const y = 744 - index * 22;
+    return `BT /F1 ${fontSize} Tf 48 ${y} Td (${pdfText(line)}) Tj ET`;
+  }).join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(body.length);
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  body += offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([body], { type: "application/pdf" });
+};
+
 export const analyticsService = {
   async getDashboard(role: DashboardRole): Promise<DashboardAnalytics> {
     const supabase = optionalSupabase();
     if (!supabase) {
-      await mockDelay();
-      return { role, metrics: metrics[role], extraMetrics: role === "admin" ? adminExtraMetrics : [], wasteTrend: fallbackWasteTrend, wasteCategories: fallbackWasteCategories, recentRequests: vendorRequests.map((item) => ({ ...item, weight: item.fillLevel })), jobs: availableJobs.map((item) => ({ ...item, weight: item.fillLevel })), markets: fallbackMarkets };
+      throw new ServiceError("Supabase is not configured. Dashboard data cannot be loaded.", 503);
     }
     await requireUser(supabase);
     const [{ data: pickupData, error: pickupError }, { data: vehicleData, error: vehicleError }, { data: recoveryData, error: recoveryError }] = await Promise.all([
@@ -158,21 +171,29 @@ export const analyticsService = {
     const recoveredByPickup = new Map((recoveryData as RecoveryRow[]).map((row) => [row.pickup_id, Number(row.recovered_weight)]));
     const totalRecoveredWeight = completed.reduce((sum, row) => sum + (recoveredByPickup.get(row.id) ?? 0), 0);
     const recyclingRate = totalActualWeight > 0 ? Math.min(100, Math.round(totalRecoveredWeight / totalActualWeight * 100)) : 0;
+    const metricChanges = role === "admin"
+      ? ["Awaiting assignment", "Recorded today", "Based on measured weight", "Currently active"]
+      : role === "recycler"
+        ? ["Available now", "Recorded today", "Across active vehicles", "Based on measured weight"]
+        : ["Created today", "Awaiting collection", "All completed pickups", "Based on measured weight"];
     const dynamicMetrics = metrics[role].map((metric, index) => {
       let value = metric.value;
       if (role === "vendor") value = [String(rows.filter((row) => row.created_at.startsWith(today)).length), String(pending.length), String(completed.length), `${recyclingRate}%`][index];
       if (role === "recycler") value = [String(pending.length), String(completedToday.length), `${Math.round((vehicleData ?? []).reduce((sum, vehicle) => sum + Number(vehicle.load_percent ?? 0), 0) / Math.max(1, (vehicleData ?? []).length))}%`, `${Math.round(totalActualWeight * 0.25)} kg`][index];
       if (role === "admin") value = [String(pending.length), String(completedToday.length), `${recyclingRate}%`, String((vehicleData ?? []).filter((vehicle) => vehicle.status === "Active").length)][index];
-      return { ...metric, value };
+      return { ...metric, value, change: metricChanges[index] };
     });
     const markets = role === "admin" ? await this.getMarkets() : [];
-    const extraMetrics = role === "admin" ? adminExtraMetrics.map((metric, index) => index === 0 ? { ...metric, value: `${Math.round(totalActualWeight)} kg` } : metric) : [];
+    const collectedToday = completedToday.reduce((sum, row) => sum + Number(row.actual_weight ?? 0), 0);
+    const activeMarkets = markets.filter((market) => !["offline", "inactive"].includes(String(market.status).toLowerCase())).length;
+    const extraValues = [`${Math.round(collectedToday)} kg`, `${recyclingRate}%`, String(markets.reduce((sum, market) => sum + market.vendors, 0)), `${activeMarkets} / ${markets.length}`];
+    const extraMetrics = role === "admin" ? adminExtraMetrics.map((metric, index) => ({ ...metric, value: extraValues[index] })) : [];
     return { role, metrics: dynamicMetrics, extraMetrics, wasteTrend: charts.wasteTrend, wasteCategories: charts.wasteCategories, recentRequests: rows.slice(0, 8).map(requestFromRow), jobs: rows.filter((row) => row.status === "pending").slice(0, 8).map(jobFromRow), markets };
   },
 
   async getCharts() {
     const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return { wasteTrend: fallbackWasteTrend, wasteCategories: fallbackWasteCategories }; }
+    if (!supabase) throw new ServiceError("Supabase is not configured. Chart data cannot be loaded.", 503);
     await requireUser(supabase);
     const { data, error } = await supabase.from("pickup_requests").select(pickupSelect).order("created_at");
     throwDatabaseError(error, "Chart data could not be loaded.");
@@ -200,11 +221,11 @@ export const analyticsService = {
 
   async getMarkets() {
     const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return fallbackMarkets.map((item) => ({ ...item })); }
+    if (!supabase) throw new ServiceError("Supabase is not configured. Market data cannot be loaded.", 503);
     await requireUser(supabase);
     const [{ data: marketRows, error: marketError }, { data: pickupRows, error: pickupError }, { data: vendorRows, error: vendorError }, { data: recoveryRows, error: recoveryError }] = await Promise.all([
       supabase.from("markets").select("id, name, ward, status").order("name"),
-      supabase.from("pickup_requests").select("id, market_id, status, actual_weight"),
+      supabase.from("pickup_requests").select("id, market_id, status, actual_weight, completed_at"),
       supabase.from("profiles").select("market_id").eq("role", "vendor"),
       supabase.from("waste_recoveries").select("pickup_id, recovered_weight"),
     ]);
@@ -215,7 +236,8 @@ export const analyticsService = {
     const recoveredByPickup = new Map((recoveryRows as RecoveryRow[]).map((row) => [row.pickup_id, Number(row.recovered_weight)]));
     return (marketRows ?? []).map((market) => {
       const pickups = (pickupRows ?? []).filter((row) => row.market_id === market.id);
-      const completed = pickups.filter((row) => row.status === "completed");
+      const today = new Date().toISOString().slice(0, 10);
+      const completed = pickups.filter((row) => row.status === "completed" && row.completed_at?.startsWith(today));
       const actualWeight = completed.reduce((sum, row) => sum + Number(row.actual_weight ?? 0), 0);
       const recoveredWeight = completed.reduce((sum, row) => sum + (recoveredByPickup.get(row.id) ?? 0), 0);
       return { market: market.name, requests: pickups.length, collected: `${Math.round(actualWeight)} kg`, rate: `${actualWeight > 0 ? Math.min(100, Math.round(recoveredWeight / actualWeight * 100)) : 0}%`, status: market.status, ward: market.ward ?? 0, vendors: (vendorRows ?? []).filter((row) => row.market_id === market.id).length };
@@ -224,7 +246,7 @@ export const analyticsService = {
 
   async getPartners() {
     const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return fallbackPartners.map((item) => ({ ...item })); }
+    if (!supabase) throw new ServiceError("Supabase is not configured. Recycler partner data cannot be loaded.", 503);
     await requireUser(supabase);
     const [{ data: profiles, error: profileError }, { data: vehicles, error: vehicleError }, { data: pickups, error: pickupError }] = await Promise.all([
       supabase.from("profiles").select("id, organization_name").eq("role", "recycler").eq("is_active", true),
@@ -241,8 +263,55 @@ export const analyticsService = {
     });
   },
 
-  async generateReport(format: "PDF" | "CSV" | "dashboard") {
-    await this.getCharts();
-    return { success: true as const, format, filename: `ecoloop-report-${new Date().toISOString().slice(0, 10)}.${format === "CSV" ? "csv" : "pdf"}` };
+  async generateReport(format: ReportFormat, title = "EcoLoop Circularity Report") {
+    const [charts, markets, partners] = await Promise.all([this.getCharts(), this.getMarkets(), this.getPartners()]);
+    const generatedAt = new Date();
+    const totalCollected = charts.wasteTrend.reduce((sum, point) => sum + point.collected, 0);
+    const totalRecycled = charts.wasteTrend.reduce((sum, point) => sum + point.recycled, 0);
+    const extension = format === "CSV" ? "csv" : "pdf";
+    const filename = `${reportSlug(title)}-${generatedAt.toISOString().slice(0, 10)}.${extension}`;
+
+    if (format === "CSV") {
+      const rows: Array<Array<string | number>> = [
+        [title],
+        ["Generated at", generatedAt.toISOString()],
+        ["Total collected (kg)", totalCollected],
+        ["Total recycled (kg)", totalRecycled],
+        [],
+        ["Monthly waste trend"],
+        ["Month", "Collected (kg)", "Recycled (kg)"],
+        ...charts.wasteTrend.map((point) => [point.month, point.collected, point.recycled]),
+        [],
+        ["Material distribution"],
+        ["Material", "Share (%)"],
+        ...charts.wasteCategories.map((point) => [point.name, point.value]),
+        [],
+        ["Connected markets"],
+        ["Market", "Ward", "Requests", "Collected", "Recycling rate", "Active vendors", "Status"],
+        ...markets.map((market) => [market.market, market.ward, market.requests, market.collected, market.rate, market.vendors, market.status]),
+        [],
+        ["Approved recycling partners"],
+        ["Partner", "Vehicles", "Jobs", "Completion rate"],
+        ...partners.map((partner) => [partner.name, partner.trucks, partner.jobs, partner.rate]),
+      ];
+      const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+      return { success: true as const, format, filename, blob: new Blob([csv], { type: "text/csv;charset=utf-8" }) };
+    }
+
+    const lines = [
+      title,
+      `Generated ${generatedAt.toLocaleString("en-IN")}`,
+      `Total collected: ${totalCollected} kg`,
+      `Total recycled: ${totalRecycled} kg`,
+      `Connected markets: ${markets.length}`,
+      `Approved recycling partners: ${partners.length}`,
+      "",
+      "Monthly waste trend",
+      ...charts.wasteTrend.map((point) => `${point.month}: ${point.collected} kg collected, ${point.recycled} kg recycled`),
+      "",
+      "Material distribution",
+      ...(charts.wasteCategories.length ? charts.wasteCategories.map((point) => `${point.name}: ${point.value}%`) : ["No completed pickup measurements recorded yet."]),
+    ];
+    return { success: true as const, format, filename, blob: createPdf(lines) };
   },
 };

@@ -13,7 +13,7 @@ import { useAsyncResource } from "@/hooks/use-async-resource";
 const copy = {
   vendor: { eyebrow: "Fresh Veg Stall 18", title: "Good morning, Anita", description: "Your waste operations are on track. Two pickups are scheduled for today.", action: "Request pickup", href: "/dashboard/vendor/request-pickup" },
   recycler: { eyebrow: "GreenCycle Pvt Ltd", title: "Good morning, Rohan", description: "Seven collections are planned today, with four nearby opportunities available.", action: "Find pickup jobs", href: "/dashboard/recycler/jobs" },
-  admin: { eyebrow: "BBMP · Bommanahalli Zone", title: "Operations overview", description: "A live view of collection performance across your markets and recycling network.", action: "Generate report", href: "/dashboard/admin/reports" },
+  admin: { eyebrow: "BBMP operations", title: "Operations overview", description: "A live view of collection performance across your markets and recycling network.", action: "Generate report", href: "/dashboard/admin/reports" },
 };
 
 export function RoleOverview({ role }: { role: DashboardRole }) {
