@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { authService } from "@/services/auth.service";
 import { cn } from "@/lib/utils";
 import type { DashboardRole } from "@/types/dashboard";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10";
 const labelClass = "text-xs font-semibold text-slate-700";
@@ -35,6 +36,7 @@ const roles = [
 
 export function SignupForm() {
   const router = useRouter();
+  const { locale } = useLanguage();
   const [step, setStep] = useState(1);
   const [role, setRole] = useState<DashboardRole | null>(null);
   const [error, setError] = useState("");
@@ -43,7 +45,7 @@ export function SignupForm() {
   const submit = async (values: SignupValues) => {
     if (!role) return; setError(""); setSuccess("");
     try {
-      const result = await authService.signup({ role, ...Object.fromEntries(Object.entries(values).filter(([,value]) => value !== undefined).map(([key,value]) => [key, String(value)])) });
+      const result = await authService.signup({ role, preferred_language: locale, ...Object.fromEntries(Object.entries(values).filter(([,value]) => value !== undefined).map(([key,value]) => [key, String(value)])) });
       if (result.requiresEmailConfirmation) {
         setSuccess("Account created. Check your email to confirm it before signing in.");
         return;

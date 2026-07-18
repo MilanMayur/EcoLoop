@@ -69,16 +69,16 @@ export const metrics: Record<DashboardRole, Metric[]> = {
 };
 
 export const vendorRequests = [
-  { id: "ECO-2048", waste: "Wet waste", weight: "42 kg", recycler: "GreenCycle Pvt Ltd", status: "Assigned", time: "Today, 11:30 AM", eta: "18 min" },
-  { id: "ECO-2041", waste: "Plastic", weight: "18 kg", recycler: "ReForm India", status: "In transit", time: "Today, 9:45 AM", eta: "6 min" },
-  { id: "ECO-2029", waste: "Dry waste", weight: "35 kg", recycler: "GreenCycle Pvt Ltd", status: "Completed", time: "Yesterday, 4:20 PM", eta: "—" },
-  { id: "ECO-2018", waste: "Metal", weight: "12 kg", recycler: "EcoMetals Co.", status: "Completed", time: "16 Jul, 2:10 PM", eta: "—" },
+  { id: "ECO-2048", waste: "Wet waste", fillLevel: "100% (Full)" as const, recycler: "GreenCycle Pvt Ltd", status: "Assigned", time: "Today, 11:30 AM", eta: "18 min" },
+  { id: "ECO-2041", waste: "Plastic", fillLevel: "Overflowing" as const, recycler: "ReForm India", status: "In transit", time: "Today, 9:45 AM", eta: "6 min" },
+  { id: "ECO-2029", waste: "Dry waste", fillLevel: "75%" as const, actualWeight: 35, recycler: "GreenCycle Pvt Ltd", status: "Completed", time: "Yesterday, 4:20 PM", eta: "—" },
+  { id: "ECO-2018", waste: "Metal", fillLevel: "50%" as const, actualWeight: 12, recycler: "EcoMetals Co.", status: "Completed", time: "16 Jul, 2:10 PM", eta: "—" },
 ];
 
 export const availableJobs = [
-  { id: "ECO-2054", vendor: "Lakshmi Flower Mart", location: "Chandapura Market · Gate 2", waste: "Wet waste", weight: "64 kg", distance: "1.2 km", priority: "High" },
-  { id: "ECO-2051", vendor: "Fresh Veg Stall 18", location: "Chandapura Market · Block C", waste: "Plastic", weight: "28 kg", distance: "2.4 km", priority: "Normal" },
-  { id: "ECO-2049", vendor: "Sri Ganesh Stores", location: "Bommanahalli Market", waste: "Dry waste", weight: "51 kg", distance: "3.8 km", priority: "Normal" },
+  { id: "ECO-2054", vendor: "Lakshmi Flower Mart", location: "Chandapura Market · Gate 2", waste: "Wet waste", fillLevel: "Overflowing" as const, createdTime: "12 min ago", distance: "1.2 km", priority: "High", notes: "Bin is beside Gate 2." },
+  { id: "ECO-2051", vendor: "Fresh Veg Stall 18", location: "Chandapura Market · Block C", waste: "Plastic", fillLevel: "100% (Full)" as const, createdTime: "24 min ago", distance: "2.4 km", priority: "Normal", notes: "Sorted plastic packaging." },
+  { id: "ECO-2049", vendor: "Sri Ganesh Stores", location: "Bommanahalli Market", waste: "Dry waste", fillLevel: "75%" as const, createdTime: "38 min ago", distance: "3.8 km", priority: "Normal", notes: "Use the service lane entrance." },
 ];
 
 export const marketStatus = [

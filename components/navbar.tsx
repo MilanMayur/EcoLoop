@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 import { cn } from "@/lib/utils";
 
 const links = [["Home", "#top"], ["Smart Stock", "#smart-stock"], ["Zero Waste", "#zero-waste"], ["Smart Market", "#smart-market"], ["Impact", "#impact"], ["Contact", "#contact"]];
@@ -25,6 +26,7 @@ export function Navbar() {
           {links.map(([label, href]) => <a className="text-xs font-medium text-slate-600 transition-colors hover:text-slate-950 xl:text-sm" href={href} key={href}>{label}</a>)}
         </nav>
         <div className="hidden items-center gap-2 lg:flex">
+          <LanguageSelector className="h-9" />
           <Button asChild variant="ghost" size="sm"><a href="/login">Login</a></Button>
           <Button asChild size="sm"><a href="#contact">Request a demo</a></Button>
         </div>
@@ -37,6 +39,7 @@ export function Navbar() {
             <Button asChild variant="outline"><a href="/login" onClick={() => setOpen(false)}>Login</a></Button>
             <Button asChild><a href="#contact" onClick={() => setOpen(false)}>Request demo</a></Button>
           </div>
+          <LanguageSelector className="mt-3 w-full justify-center" />
         </nav>
       </div>
     </header>

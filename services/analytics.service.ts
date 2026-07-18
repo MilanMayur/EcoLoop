@@ -5,18 +5,28 @@ import type { DashboardAnalytics, MarketSummary, PickupJob, PickupRequest, Recyc
 import { mockDelay, optionalSupabase, relativeTime, requireUser, throwDatabaseError } from "@/services/supabase.data";
 
 type AnalyticsPickup = {
+  id: string;
   reference_code: string;
   vendor_name: string;
   location: string;
   waste_type: string;
-  estimated_weight: number | string;
-  collected_weight: number | string | null;
+  fill_level: PickupRequest["fillLevel"];
+  actual_weight: number | string | null;
+  image_url: string | null;
+  completion_image_url: string | null;
+  facility: string | null;
+  notes: string | null;
   priority: string;
   status: string;
   recycler_id: string | null;
   market_id: string | null;
   created_at: string;
   completed_at: string | null;
+};
+
+type RecoveryRow = {
+  pickup_id: string;
+  recovered_weight: number | string;
 };
 
 const fallbackWasteTrend = [
@@ -62,7 +72,13 @@ const colors = ["#16A34A", "#3B82F6", "#8B5CF6", "#F59E0B", "#0F766E"];
 const requestFromRow = (row: AnalyticsPickup): PickupRequest => ({
   id: row.reference_code,
   waste: `${row.waste_type} waste`,
-  weight: `${Number(row.collected_weight ?? row.estimated_weight)} kg`,
+  fillLevel: row.fill_level,
+  weight: row.fill_level,
+  actualWeight: row.actual_weight === null ? undefined : Number(row.actual_weight),
+  imageUrl: row.image_url ?? undefined,
+  completionImageUrl: row.completion_image_url ?? undefined,
+  facility: row.facility ?? undefined,
+  notes: row.notes ?? undefined,
   recycler: row.recycler_id ? "Verified recycling partner" : "Matching in progress",
   status: row.status.split("_").map((word) => word[0].toUpperCase() + word.slice(1)).join(" "),
   time: relativeTime(row.created_at),
@@ -74,7 +90,14 @@ const jobFromRow = (row: AnalyticsPickup): PickupJob => ({
   vendor: row.vendor_name || "EcoLoop vendor",
   location: row.location || "Market location",
   waste: `${row.waste_type} waste`,
-  weight: `${Number(row.collected_weight ?? row.estimated_weight)} kg`,
+  fillLevel: row.fill_level,
+  weight: row.fill_level,
+  actualWeight: row.actual_weight === null ? undefined : Number(row.actual_weight),
+  imageUrl: row.image_url ?? undefined,
+  completionImageUrl: row.completion_image_url ?? undefined,
+  facility: row.facility ?? undefined,
+  notes: row.notes ?? undefined,
+  createdTime: relativeTime(row.created_at),
   distance: "Nearby",
   priority: row.priority,
   status: row.status === "pending" ? "Available" : row.status === "in_transit" ? "In transit" : row.status === "completed" ? "Completed" : "Accepted",
@@ -89,12 +112,14 @@ const chartsFromRows = (rows: AnalyticsPickup[]) => {
   });
   const categoryTotals = new Map<string, number>();
   for (const row of rows) {
-    const date = new Date(row.created_at);
+    if (row.status !== "completed") continue;
+    const weight = Number(row.actual_weight ?? 0);
+    if (!Number.isFinite(weight) || weight <= 0) continue;
+    const date = new Date(row.completed_at ?? row.created_at);
     const month = months.find((item) => item.key === `${date.getFullYear()}-${date.getMonth()}`);
-    const weight = Number(row.collected_weight ?? row.estimated_weight);
     if (month) {
       month.collected += weight;
-      if (row.status === "completed") month.recycled += Number(row.collected_weight ?? row.estimated_weight);
+      month.recycled += weight;
     }
     categoryTotals.set(row.waste_type, (categoryTotals.get(row.waste_type) ?? 0) + weight);
   }
@@ -105,37 +130,44 @@ const chartsFromRows = (rows: AnalyticsPickup[]) => {
   };
 };
 
-const pickupSelect = "reference_code, vendor_name, location, waste_type, estimated_weight, collected_weight, priority, status, recycler_id, market_id, created_at, completed_at";
+const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, image_url, completion_image_url, facility, notes, priority, status, recycler_id, market_id, created_at, completed_at";
 
 export const analyticsService = {
   async getDashboard(role: DashboardRole): Promise<DashboardAnalytics> {
     const supabase = optionalSupabase();
     if (!supabase) {
       await mockDelay();
-      return { role, metrics: metrics[role], extraMetrics: role === "admin" ? adminExtraMetrics : [], wasteTrend: fallbackWasteTrend, wasteCategories: fallbackWasteCategories, recentRequests: vendorRequests, jobs: availableJobs, markets: fallbackMarkets };
+      return { role, metrics: metrics[role], extraMetrics: role === "admin" ? adminExtraMetrics : [], wasteTrend: fallbackWasteTrend, wasteCategories: fallbackWasteCategories, recentRequests: vendorRequests.map((item) => ({ ...item, weight: item.fillLevel })), jobs: availableJobs.map((item) => ({ ...item, weight: item.fillLevel })), markets: fallbackMarkets };
     }
     await requireUser(supabase);
-    const [{ data: pickupData, error: pickupError }, { data: vehicleData, error: vehicleError }] = await Promise.all([
+    const [{ data: pickupData, error: pickupError }, { data: vehicleData, error: vehicleError }, { data: recoveryData, error: recoveryError }] = await Promise.all([
       supabase.from("pickup_requests").select(pickupSelect).order("created_at", { ascending: false }),
       supabase.from("vehicles").select("capacity_kg, load_percent, status"),
+      supabase.from("waste_recoveries").select("pickup_id, recovered_weight"),
     ]);
     throwDatabaseError(pickupError, "Dashboard pickup data could not be loaded.");
     throwDatabaseError(vehicleError, "Dashboard vehicle data could not be loaded.");
+    throwDatabaseError(recoveryError, "Waste recovery data could not be loaded.");
     const rows = pickupData as AnalyticsPickup[];
     const charts = chartsFromRows(rows);
     const today = new Date().toISOString().slice(0, 10);
     const completed = rows.filter((row) => row.status === "completed");
     const pending = rows.filter((row) => row.status === "pending");
     const completedToday = completed.filter((row) => row.completed_at?.startsWith(today));
+    const totalActualWeight = completed.reduce((sum, row) => sum + Number(row.actual_weight ?? 0), 0);
+    const recoveredByPickup = new Map((recoveryData as RecoveryRow[]).map((row) => [row.pickup_id, Number(row.recovered_weight)]));
+    const totalRecoveredWeight = completed.reduce((sum, row) => sum + (recoveredByPickup.get(row.id) ?? 0), 0);
+    const recyclingRate = totalActualWeight > 0 ? Math.min(100, Math.round(totalRecoveredWeight / totalActualWeight * 100)) : 0;
     const dynamicMetrics = metrics[role].map((metric, index) => {
       let value = metric.value;
-      if (role === "vendor") value = [String(rows.filter((row) => row.created_at.startsWith(today)).length), String(pending.length), String(completed.length), `${rows.length ? Math.round(completed.length / rows.length * 100) : 0}%`][index];
-      if (role === "recycler") value = [String(pending.length), String(completedToday.length), `${Math.round((vehicleData ?? []).reduce((sum, vehicle) => sum + Number(vehicle.load_percent ?? 0), 0) / Math.max(1, (vehicleData ?? []).length))}%`, `${Math.round(completed.reduce((sum, row) => sum + Number(row.collected_weight ?? 0), 0) * 0.25)} kg`][index];
-      if (role === "admin") value = [String(pending.length), String(completedToday.length), `${rows.length ? Math.round(completed.length / rows.length * 100) : 0}%`, String((vehicleData ?? []).filter((vehicle) => vehicle.status === "Active").length)][index];
+      if (role === "vendor") value = [String(rows.filter((row) => row.created_at.startsWith(today)).length), String(pending.length), String(completed.length), `${recyclingRate}%`][index];
+      if (role === "recycler") value = [String(pending.length), String(completedToday.length), `${Math.round((vehicleData ?? []).reduce((sum, vehicle) => sum + Number(vehicle.load_percent ?? 0), 0) / Math.max(1, (vehicleData ?? []).length))}%`, `${Math.round(totalActualWeight * 0.25)} kg`][index];
+      if (role === "admin") value = [String(pending.length), String(completedToday.length), `${recyclingRate}%`, String((vehicleData ?? []).filter((vehicle) => vehicle.status === "Active").length)][index];
       return { ...metric, value };
     });
     const markets = role === "admin" ? await this.getMarkets() : [];
-    return { role, metrics: dynamicMetrics, extraMetrics: role === "admin" ? adminExtraMetrics : [], wasteTrend: charts.wasteTrend, wasteCategories: charts.wasteCategories, recentRequests: rows.slice(0, 8).map(requestFromRow), jobs: rows.filter((row) => row.status === "pending").slice(0, 8).map(jobFromRow), markets };
+    const extraMetrics = role === "admin" ? adminExtraMetrics.map((metric, index) => index === 0 ? { ...metric, value: `${Math.round(totalActualWeight)} kg` } : metric) : [];
+    return { role, metrics: dynamicMetrics, extraMetrics, wasteTrend: charts.wasteTrend, wasteCategories: charts.wasteCategories, recentRequests: rows.slice(0, 8).map(requestFromRow), jobs: rows.filter((row) => row.status === "pending").slice(0, 8).map(jobFromRow), markets };
   },
 
   async getCharts() {
@@ -170,18 +202,23 @@ export const analyticsService = {
     const supabase = optionalSupabase();
     if (!supabase) { await mockDelay(); return fallbackMarkets.map((item) => ({ ...item })); }
     await requireUser(supabase);
-    const [{ data: marketRows, error: marketError }, { data: pickupRows, error: pickupError }, { data: vendorRows, error: vendorError }] = await Promise.all([
+    const [{ data: marketRows, error: marketError }, { data: pickupRows, error: pickupError }, { data: vendorRows, error: vendorError }, { data: recoveryRows, error: recoveryError }] = await Promise.all([
       supabase.from("markets").select("id, name, ward, status").order("name"),
-      supabase.from("pickup_requests").select("market_id, status, collected_weight, estimated_weight"),
+      supabase.from("pickup_requests").select("id, market_id, status, actual_weight"),
       supabase.from("profiles").select("market_id").eq("role", "vendor"),
+      supabase.from("waste_recoveries").select("pickup_id, recovered_weight"),
     ]);
     throwDatabaseError(marketError, "Market data could not be loaded.");
     throwDatabaseError(pickupError, "Market pickup data could not be loaded.");
     throwDatabaseError(vendorError, "Market vendor data could not be loaded.");
+    throwDatabaseError(recoveryError, "Market recovery data could not be loaded.");
+    const recoveredByPickup = new Map((recoveryRows as RecoveryRow[]).map((row) => [row.pickup_id, Number(row.recovered_weight)]));
     return (marketRows ?? []).map((market) => {
       const pickups = (pickupRows ?? []).filter((row) => row.market_id === market.id);
       const completed = pickups.filter((row) => row.status === "completed");
-      return { market: market.name, requests: pickups.length, collected: `${Math.round(completed.reduce((sum, row) => sum + Number(row.collected_weight ?? row.estimated_weight), 0))} kg`, rate: `${pickups.length ? Math.round(completed.length / pickups.length * 100) : 0}%`, status: market.status, ward: market.ward ?? 0, vendors: (vendorRows ?? []).filter((row) => row.market_id === market.id).length };
+      const actualWeight = completed.reduce((sum, row) => sum + Number(row.actual_weight ?? 0), 0);
+      const recoveredWeight = completed.reduce((sum, row) => sum + (recoveredByPickup.get(row.id) ?? 0), 0);
+      return { market: market.name, requests: pickups.length, collected: `${Math.round(actualWeight)} kg`, rate: `${actualWeight > 0 ? Math.min(100, Math.round(recoveredWeight / actualWeight * 100)) : 0}%`, status: market.status, ward: market.ward ?? 0, vendors: (vendorRows ?? []).filter((row) => row.market_id === market.id).length };
     });
   },
 

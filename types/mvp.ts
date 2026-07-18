@@ -2,10 +2,21 @@ import type { DashboardRole, Metric, StockProduct } from "@/types/dashboard";
 
 export type ServiceErrorCode = "NETWORK" | "VALIDATION" | "NOT_FOUND" | "UNKNOWN";
 
+export type FillLevel = "25%" | "50%" | "75%" | "100% (Full)" | "Overflowing";
+export type PickupTimelineItem = { status: string; time: string; note?: string };
+
 export type PickupRequest = {
   id: string;
   waste: string;
-  weight: string;
+  fillLevel: FillLevel;
+  /** Legacy overview display alias; contains the bin fill level, never an estimated weight. */
+  weight?: string;
+  actualWeight?: number;
+  imageUrl?: string;
+  completionImageUrl?: string;
+  facility?: string;
+  notes?: string;
+  timeline?: PickupTimelineItem[];
   recycler: string;
   status: string;
   time: string;
@@ -17,7 +28,15 @@ export type PickupJob = {
   vendor: string;
   location: string;
   waste: string;
-  weight: string;
+  fillLevel: FillLevel;
+  /** Legacy overview display alias; contains the bin fill level, never an estimated weight. */
+  weight?: string;
+  actualWeight?: number;
+  imageUrl?: string;
+  completionImageUrl?: string;
+  facility?: string;
+  notes?: string;
+  createdTime: string;
   distance: string;
   priority: string;
   status?: "Available" | "Accepted" | "In transit" | "Completed";
@@ -25,9 +44,17 @@ export type PickupJob = {
 
 export type PickupInput = {
   wasteType: string;
-  weight: number;
+  fillLevel: FillLevel;
   priority: string;
   notes?: string;
+  imageUrl?: string;
+};
+
+export type PickupCompletionInput = {
+  actualWeight: number;
+  facility: string;
+  notes?: string;
+  completionImageUrl?: string;
 };
 
 export type InventoryInput = Omit<StockProduct, "id" | "forecast" | "risk">;
