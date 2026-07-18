@@ -1,8 +1,16 @@
 begin;
 
 alter table public.profiles
+  add column if not exists preferred_language text not null default 'en',
   add column if not exists market text not null default '',
   add column if not exists profile_image_url text;
+
+alter table public.profiles
+  drop constraint if exists profiles_preferred_language_check;
+
+alter table public.profiles
+  add constraint profiles_preferred_language_check
+  check (preferred_language in ('en', 'kn', 'hi'));
 
 update public.profiles
 set market = organization_name

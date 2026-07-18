@@ -57,6 +57,7 @@ const friendlyAuthError = (message: string, fallback: string) => {
   if (normalized.includes("email not confirmed") || normalized.includes("email not verified")) return "Confirm your email before signing in.";
   if (normalized.includes("user already registered") || normalized.includes("already been registered")) return "An account already exists for this email.";
   if (normalized.includes("user not found")) return "No EcoLoop account was found for this email.";
+  if (normalized.includes("database error saving new user") || normalized.includes("unexpected_failure")) return "EcoLoop account setup is incomplete in Supabase. Run the latest authentication profile migration and try again.";
   if (normalized.includes("password should") || normalized.includes("weak password")) return "Use a stronger password with at least 8 characters.";
   if (normalized.includes("expired") || normalized.includes("otp_expired")) return "This verification or password-reset link has expired. Request a new one.";
   if (normalized.includes("network") || normalized.includes("fetch") || normalized.includes("failed to fetch")) return "A network error occurred. Check your connection and try again.";
