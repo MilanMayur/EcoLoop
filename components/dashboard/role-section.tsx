@@ -24,7 +24,7 @@ import { pickupService } from "@/services/pickup.service";
 import { useAsyncResource } from "@/hooks/use-async-resource";
 import { includesSearch, paginate } from "@/utils/table";
 
-const inputClass = "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
+const inputClass = "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
 const labelClass = "text-xs font-semibold text-slate-700 dark:text-slate-300";
 
 const pickupSchema = z.object({
@@ -105,7 +105,7 @@ function PhotoUploadField({ label, helper, onChange }: { label: string; helper: 
   return (
     <div>
       <p className={labelClass}>{label}</p>
-      <div className="mt-2 grid grid-cols-2 gap-3">
+      <div className="mt-2 grid gap-3 min-[430px]:grid-cols-2">
         <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
           <ImagePlus className="size-4 text-emerald-600" /> Capture Photo
           <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(event) => chooseFile(event.target.files?.[0])} />
@@ -177,7 +177,7 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
     ? ["Request ID", "Waste type", "Fill level", "Actual weight", "Pickup photo", "Completion photo", "Status", "Status timeline"]
     : ["Request ID", "Waste type", "Fill level", "Actual weight", "Assigned recycler", "Status", "Created time", "ETA"];
   return (
-    <div className="space-y-7">
+    <div className="space-y-5 sm:space-y-7">
       <PageHeader eyebrow={admin ? "BBMP operations" : "Vendor operations"} title={history ? "Pickup history" : admin ? "Pickup requests" : "My requests"} description={history ? "A complete, auditable record of recovered waste." : admin ? "Live status and SLA visibility across all connected markets." : "Track live pickup status, assigned partners, and arrival estimates."} action={!history && !admin && <Button asChild><Link href="/dashboard/vendor/request-pickup"><Plus className="size-4" /> New request</Link></Button>} />
       <Panel>
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row">
@@ -186,7 +186,8 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
           <select aria-label="Sort requests" value={sort} onChange={(event) => setSort(event.target.value)} className={`${inputClass} mt-0 sm:w-32`}><option>Newest</option><option>Oldest</option></select>
         </div>
         {resource.loading ? <div className="h-56 animate-pulse bg-slate-50 dark:bg-slate-900" /> : resource.error ? <div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div> : pageInfo.rows.length ? <>
-          <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left">
+          <div className="grid gap-2.5 p-3 sm:hidden">{pageInfo.rows.map((item) => <article key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-950/50"><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Pickup request</p><h3 className="mt-1 text-xs font-semibold">{item.id}</h3></div><StatusBadge status={item.status} /></div><div className="mt-3 grid grid-cols-2 gap-3 text-[10px]"><div><p className="text-slate-400">Waste type</p><p className="mt-1 font-semibold">{item.waste}</p></div><div><p className="text-slate-400">Fill level</p><p className="mt-1 font-semibold">{item.fillLevel}</p></div><div><p className="text-slate-400">Actual weight</p><p className="mt-1 font-semibold">{item.actualWeight ? `${item.actualWeight} kg` : "Pending"}</p></div><div><p className="text-slate-400">Requested</p><p className="mt-1 font-semibold">{item.time}</p></div></div>{admin ? <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3 dark:border-slate-800"><PickupPhoto url={item.imageUrl} alt={`Pickup ${item.id}`} /><PickupPhoto url={item.completionImageUrl} alt={`Completed pickup ${item.id}`} /><span className="ml-auto text-[10px] text-slate-400">Pickup · Completion</span></div> : <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-[10px] dark:border-slate-800"><span className="text-slate-400">{item.recycler}</span><span className="font-semibold">ETA {item.eta}</span></div>}</article>)}</div>
+          <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[1050px] text-left">
             <thead><tr className="border-b border-slate-100 text-[9px] uppercase tracking-wider text-slate-400 dark:border-slate-800">{headers.map((heading) => <th key={heading} className="px-6 py-3 font-semibold">{heading}</th>)}</tr></thead>
             <tbody>{pageInfo.rows.map((item) => <tr key={item.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
               <td className="px-6 py-4 text-xs font-semibold">{item.id}</td>
@@ -206,7 +207,7 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
               </>}
             </tr>)}</tbody>
           </table></div>
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-[10px] text-slate-400 dark:border-slate-800"><span>{pageInfo.total} request{pageInfo.total === 1 ? "" : "s"}</span><div className="flex items-center gap-2"><Button size="sm" variant="outline" disabled={pageInfo.page === 1} onClick={() => setPage(pageInfo.page - 1)}>Previous</Button><span>Page {pageInfo.page} of {pageInfo.totalPages}</span><Button size="sm" variant="outline" disabled={pageInfo.page === pageInfo.totalPages} onClick={() => setPage(pageInfo.page + 1)}>Next</Button></div></div>
+          <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 text-[10px] text-slate-400 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><span>{pageInfo.total} request{pageInfo.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-2 sm:justify-end"><Button size="sm" variant="outline" disabled={pageInfo.page === 1} onClick={() => setPage(pageInfo.page - 1)}>Previous</Button><span>Page {pageInfo.page} of {pageInfo.totalPages}</span><Button size="sm" variant="outline" disabled={pageInfo.page === pageInfo.totalPages} onClick={() => setPage(pageInfo.page + 1)}>Next</Button></div></div>
         </> : <EmptyState icon={<ClipboardCheck className="size-5" />} title="No requests found" description="Try changing the search or status filter." />}
       </Panel>
     </div>

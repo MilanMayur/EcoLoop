@@ -38,41 +38,41 @@ const stats = [
 
 export default function Home() {
   return (
-    <HomepageSessionProvider><main className="overflow-hidden bg-[#F8FAFC]">
+    <HomepageSessionProvider><main className="landing-page overflow-hidden bg-[#F8FAFC]">
       <Navbar />
 
-      <section id="top" className="relative min-h-screen overflow-hidden bg-[#F8FAFC] pt-28 sm:pt-32">
+      <section id="top" className="relative overflow-hidden bg-[#F8FAFC] pt-24 sm:min-h-screen sm:pt-32">
         <div className="noise" />
         <div className="absolute -left-32 top-48 size-80 rounded-full border border-emerald-200/70" aria-hidden="true" />
         <div className="absolute -left-12 top-68 size-28 rounded-full border border-emerald-200/80" aria-hidden="true" />
-        <div className="container-page relative grid items-center gap-12 pb-20 lg:grid-cols-[.88fr_1.12fr] lg:gap-10 lg:pb-28">
+        <div className="container-page relative grid items-center gap-8 pb-12 sm:gap-12 sm:pb-20 lg:grid-cols-[.88fr_1.12fr] lg:gap-10 lg:pb-28">
           <Reveal className="relative z-10">
-            <div className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-emerald-200 bg-white px-3.5 py-2 text-xs font-semibold text-emerald-800 shadow-sm">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-800 shadow-sm sm:mb-7 sm:gap-2.5 sm:px-3.5 sm:py-2 sm:text-xs">
               <PulseDot />
               Building circular markets for Bengaluru
             </div>
-            <h1 className="max-w-[650px] text-[clamp(3.5rem,7vw,6.7rem)] font-semibold leading-[.92] tracking-[-.075em] text-slate-950">
+            <h1 className="max-w-[650px] break-words text-[clamp(2.5rem,13vw,6.7rem)] font-semibold leading-[.94] tracking-[-.07em] text-slate-950 sm:leading-[.92] sm:tracking-[-.075em]">
               Small stock.<br /><span className="text-emerald-600">Zero waste.</span><br />Smart market.
             </h1>
-            <p className="mt-7 max-w-xl text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
+            <p className="mt-4 max-w-xl text-sm leading-6 text-slate-600 sm:mt-7 sm:text-lg sm:leading-8">
               EcoLoop is an AI-powered Smart Market Sustainability Platform that helps vendors optimize inventory, prevent excess stock, reduce waste, and connect with BBMP and recycling partners through one intelligent digital ecosystem.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 flex flex-col gap-2.5 sm:mt-9 sm:flex-row sm:gap-3">
               <HomepageHeroActions />
             </div>
-            <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-xs font-medium text-slate-500">
+            <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[11px] font-medium text-slate-500 sm:mt-9 sm:gap-x-6 sm:gap-y-3 sm:text-xs">
               <span className="flex items-center gap-2"><Check className="size-4 text-emerald-600" /> Built for Indian markets</span>
               <span className="flex items-center gap-2"><Check className="size-4 text-emerald-600" /> End-to-end traceability</span>
             </div>
           </Reveal>
 
-          <Reveal delay={0.12} className="relative lg:-mr-20">
+          <Reveal delay={0.12} className="relative xl:-mr-20">
             <div className="absolute -inset-7 rounded-[3rem] border border-emerald-100" aria-hidden="true" />
             <Float className="relative overflow-hidden rounded-[2rem] border border-white bg-white p-2 shadow-[0_28px_70px_rgba(15,23,42,.14)] sm:rounded-[2.6rem] sm:p-3">
               <Image src="/ecoloop-circular-market.webp" alt="A vendor, smart sorting bins, electric collection vehicle and recycling facility connected in a circular system" width={1728} height={960} priority className="aspect-[1.28/1] w-full rounded-[1.55rem] object-cover sm:rounded-[2rem]" sizes="(max-width: 1024px) 92vw, 58vw" />
-              <div className="absolute inset-x-5 bottom-5 flex items-center justify-between rounded-2xl border border-white/80 bg-white/92 px-4 py-3 shadow-xl backdrop-blur-md sm:inset-x-auto sm:bottom-7 sm:left-7 sm:min-w-72">
+              <div className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-xl border border-white/80 bg-white/92 px-3 py-2 shadow-xl backdrop-blur-md sm:inset-x-auto sm:bottom-7 sm:left-7 sm:min-w-72 sm:rounded-2xl sm:px-4 sm:py-3">
                 <div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-slate-400">AI inventory insight</p><p className="mt-1 text-sm font-semibold text-slate-900">15 kg overstock prevented</p></div>
-                <span className="grid size-10 place-items-center rounded-xl bg-emerald-50"><BrainCircuit className="size-5 text-emerald-600" /></span>
+                <span className="grid size-9 place-items-center rounded-lg bg-emerald-50 sm:size-10 sm:rounded-xl"><BrainCircuit className="size-4 text-emerald-600 sm:size-5" /></span>
               </div>
             </Float>
             <div className="absolute -right-1 -top-5 hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-700 shadow-lg sm:flex"><Building2 className="size-5 text-blue-500" /> BBMP dashboard connected</div>
@@ -81,19 +81,19 @@ export default function Home() {
         </div>
       </section>
 
-      <section aria-labelledby="live-heading" className="relative z-10 -mt-1 pb-24">
+      <section aria-labelledby="live-heading" className="relative z-10 -mt-1 pb-12 sm:pb-24">
         <div className="container-page">
-          <Reveal className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,.06)]">
+          <Reveal className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,.06)] sm:rounded-[2rem]">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-7">
               <div className="flex items-center gap-2.5"><PulseDot /><h2 id="live-heading" className="text-xs font-bold uppercase tracking-[.12em] text-slate-600">Live operations snapshot</h2></div>
               <span className="hidden text-xs text-slate-400 sm:block">KR Market · Today</span>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4">
               {stats.map((stat, index) => (
-                <div key={stat.label} className={`relative px-6 py-7 sm:px-7 ${index > 0 ? "border-t border-slate-100 sm:border-t-0" : ""} ${index % 2 ? "sm:border-l" : ""} ${index > 1 ? "lg:border-l lg:border-t-0" : ""}`}>
-                  <div className="text-3xl font-semibold tracking-[-.05em] text-slate-950 sm:text-4xl"><CountUp value={stat.value} suffix={stat.suffix} decimals={stat.decimals} /></div>
-                  <p className="mt-2 text-sm font-medium text-slate-700">{stat.label}</p>
-                  <p className="mt-3 text-[11px] font-medium text-emerald-700">{stat.trend}</p>
+                <div key={stat.label} className={`relative px-3.5 py-4 sm:px-7 sm:py-7 ${index > 1 ? "border-t border-slate-100 lg:border-t-0" : ""} ${index % 2 ? "border-l border-slate-100" : ""} ${index > 0 ? "lg:border-l" : ""}`}>
+                  <div className="text-2xl font-semibold tracking-[-.05em] text-slate-950 sm:text-4xl"><CountUp value={stat.value} suffix={stat.suffix} decimals={stat.decimals} /></div>
+                  <p className="mt-1.5 text-xs font-medium text-slate-700 sm:mt-2 sm:text-sm">{stat.label}</p>
+                  <p className="mt-2 text-[9px] font-medium leading-4 text-emerald-700 sm:mt-3 sm:text-[11px]">{stat.trend}</p>
                 </div>
               ))}
             </div>
@@ -102,18 +102,18 @@ export default function Home() {
       </section>
 
       <section className="section-pad bg-white">
-        <div className="container-page grid gap-14 lg:grid-cols-[.8fr_1.2fr] lg:gap-20">
+        <div className="container-page grid gap-8 sm:gap-14 lg:grid-cols-[.8fr_1.2fr] lg:gap-20">
           <Reveal>
             <span className="eyebrow"><Waves className="size-4" /> The challenge</span>
             <h2 className="section-title">Markets are moving fast.<br />Waste systems aren’t.</h2>
             <p className="section-copy">Traditional collection relies on fragmented calls, fixed routes, and almost no data. The cost shows up in every overflowing bin.</p>
-            <div className="mt-9 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:mt-9 sm:rounded-2xl sm:p-5">
               <p className="text-sm font-semibold text-amber-950">The hidden cost</p>
               <p className="mt-2 text-sm leading-6 text-amber-800">When recyclable material is mixed at source, its recovery value can disappear before collection even begins.</p>
             </div>
           </Reveal>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {problems.map((item, index) => <Reveal key={item.title} delay={index * .06} className="group rounded-[1.75rem] border border-slate-200 bg-[#F8FAFC] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:bg-white hover:shadow-xl"><span className="grid size-12 place-items-center rounded-2xl bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 group-hover:text-emerald-600"><item.icon className="size-5" /></span><h3 className="mt-8 text-lg font-semibold tracking-[-.025em] text-slate-950">{item.title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{item.text}</p></Reveal>)}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {problems.map((item, index) => <Reveal key={item.title} delay={index * .06} className="group rounded-xl border border-slate-200 bg-[#F8FAFC] p-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:bg-white hover:shadow-xl sm:rounded-[1.75rem] sm:p-6"><span className="grid size-9 place-items-center rounded-lg bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 group-hover:text-emerald-600 sm:size-12 sm:rounded-2xl"><item.icon className="size-4 sm:size-5" /></span><h3 className="mt-4 text-sm font-semibold tracking-[-.025em] text-slate-950 sm:mt-8 sm:text-lg">{item.title}</h3><p className="mt-1.5 text-xs leading-5 text-slate-500 sm:mt-2 sm:text-sm sm:leading-6">{item.text}</p></Reveal>)}
           </div>
         </div>
       </section>
@@ -126,25 +126,25 @@ export default function Home() {
       <section id="partners" className="section-pad bg-[#EEF7F1]">
         <div className="container-page">
           <Reveal><span className="eyebrow"><Users className="size-4" /> Built for the whole ecosystem</span><h2 className="section-title">One loop. Shared value.</h2><p className="section-copy">Each stakeholder gets exactly what they need—and the city gets a cleaner, more accountable market.</p></Reveal>
-          <div className="mt-14 grid gap-5 md:grid-cols-2">
-            {stakeholders.map((item, index) => <Reveal key={item.label} delay={(index % 2) * .07} className="group rounded-[2rem] border border-emerald-100 bg-white p-7 shadow-[0_14px_40px_rgba(22,101,52,.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(22,101,52,.1)] sm:p-8"><div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><item.icon className="size-5" /></span><span className="text-xs font-bold uppercase tracking-[.12em] text-emerald-700">{item.label}</span></div><h3 className="mt-7 max-w-md text-2xl font-semibold leading-tight tracking-[-.04em] text-slate-950">{item.title}</h3><ul className="mt-6 grid gap-3">{item.points.map(point => <li key={point} className="flex items-center gap-3 text-sm text-slate-600"><span className="grid size-5 place-items-center rounded-full bg-emerald-100"><Check className="size-3 text-emerald-700" /></span>{point}</li>)}</ul></Reveal>)}
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:mt-14 sm:gap-5">
+            {stakeholders.map((item, index) => <Reveal key={item.label} delay={(index % 2) * .07} className="group rounded-xl border border-emerald-100 bg-white p-3.5 shadow-[0_14px_40px_rgba(22,101,52,.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(22,101,52,.1)] sm:rounded-[2rem] sm:p-8"><div className="flex items-center gap-2 sm:gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700 sm:size-11 sm:rounded-xl"><item.icon className="size-4 sm:size-5" /></span><span className="text-[9px] font-bold uppercase tracking-[.08em] text-emerald-700 sm:text-xs sm:tracking-[.12em]">{item.label}</span></div><h3 className="mt-4 max-w-md text-base font-semibold leading-tight tracking-[-.04em] text-slate-950 sm:mt-7 sm:text-2xl">{item.title}</h3><ul className="mt-4 grid gap-2 sm:mt-6 sm:gap-3">{item.points.map(point => <li key={point} className="flex items-start gap-2 text-[11px] leading-4 text-slate-600 sm:items-center sm:gap-3 sm:text-sm"><span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-emerald-100 sm:mt-0 sm:size-5"><Check className="size-2.5 text-emerald-700 sm:size-3" /></span>{point}</li>)}</ul></Reveal>)}
           </div>
         </div>
       </section>
 
       <LandingImpact />
 
-      <section id="contact" className="relative overflow-hidden border-y border-emerald-100 bg-emerald-50 py-24 sm:py-32">
+      <section id="contact" className="relative overflow-hidden border-y border-emerald-100 bg-emerald-50 py-14 sm:py-32">
         <div className="absolute left-1/2 top-1/2 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-200" aria-hidden="true" /><div className="absolute left-1/2 top-1/2 size-[20rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-200" aria-hidden="true" />
-        <Reveal className="container-page relative text-center"><span className="eyebrow"><MapPin className="size-4" /> Start with one market</span><h2 className="mx-auto mt-5 max-w-3xl text-[clamp(2.7rem,6vw,5.5rem)] font-semibold leading-[.98] tracking-[-.07em] text-slate-950">Ready to build<br />a smarter market?</h2><p className="mx-auto mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">Bring inventory intelligence, responsible waste recovery, and civic operations into one connected sustainability platform.</p><div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row"><HomepageContactActions /></div></Reveal>
+        <Reveal className="container-page relative text-center"><span className="eyebrow"><MapPin className="size-4" /> Start with one market</span><h2 className="mx-auto mt-3 max-w-3xl text-[clamp(2.25rem,11vw,5.5rem)] font-semibold leading-[.98] tracking-[-.07em] text-slate-950 sm:mt-5">Ready to build<br />a smarter market?</h2><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-600 sm:mt-6 sm:text-lg sm:leading-7">Bring inventory intelligence, responsible waste recovery, and civic operations into one connected sustainability platform.</p><div className="mt-6 flex flex-col justify-center gap-2.5 sm:mt-9 sm:flex-row sm:gap-3"><HomepageContactActions /></div></Reveal>
       </section>
 
-      <footer className="bg-white py-12">
+      <footer className="bg-white py-8 sm:py-12">
         <div className="container-page">
-          <div className="grid gap-10 border-b border-slate-200 pb-10 md:grid-cols-[1.4fr_1fr_1fr]">
+          <div className="grid gap-6 border-b border-slate-200 pb-6 sm:gap-10 sm:pb-10 md:grid-cols-[1.4fr_1fr_1fr]">
             <div><Logo /><p className="mt-5 max-w-sm text-sm leading-6 text-slate-500">AI-Powered Smart Market Sustainability Platform for cleaner markets, resilient vendors, and a more circular Bengaluru.</p></div>
-            <div><p className="text-xs font-bold uppercase tracking-[.12em] text-slate-900">Platform</p><div className="mt-4 grid gap-3 text-sm text-slate-500"><a className="hover:text-emerald-600" href="#smart-stock">Smart Stock</a><a className="hover:text-emerald-600" href="#zero-waste">Zero Waste</a><a className="hover:text-emerald-600" href="#smart-market">Smart Market</a><a className="hover:text-emerald-600" href="#impact">Impact</a></div></div>
-            <div><p className="text-xs font-bold uppercase tracking-[.12em] text-slate-900">Connect</p><div className="mt-4 grid gap-3 text-sm text-slate-500"><a className="hover:text-emerald-600" href="mailto:hello@ecoloop.city">hello@ecoloop.city</a><span>Bengaluru, Karnataka</span><a className="hover:text-emerald-600" href="#top">Faculty & research</a></div></div>
+            <div><p className="text-xs font-bold uppercase tracking-[.12em] text-slate-900">Platform</p><div className="mt-3 grid text-sm text-slate-500 sm:mt-4 sm:gap-1"><a className="flex min-h-11 items-center hover:text-emerald-600" href="#smart-stock">Smart Stock</a><a className="flex min-h-11 items-center hover:text-emerald-600" href="#zero-waste">Zero Waste</a><a className="flex min-h-11 items-center hover:text-emerald-600" href="#smart-market">Smart Market</a><a className="flex min-h-11 items-center hover:text-emerald-600" href="#impact">Impact</a></div></div>
+            <div><p className="text-xs font-bold uppercase tracking-[.12em] text-slate-900">Connect</p><div className="mt-3 grid text-sm text-slate-500 sm:mt-4 sm:gap-1"><a className="flex min-h-11 items-center hover:text-emerald-600" href="mailto:hello@ecoloop.city">hello@ecoloop.city</a><span className="flex min-h-11 items-center">Bengaluru, Karnataka</span><a className="flex min-h-11 items-center hover:text-emerald-600" href="#top">Faculty & research</a></div></div>
           </div>
           <div className="flex flex-col gap-3 pt-6 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 EcoLoop. Built for cleaner markets.</p><p>Small Stock · Zero Waste · Smart Market</p></div>
         </div>

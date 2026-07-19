@@ -13,7 +13,7 @@ const buttonVariants = cva(
         outline: "border border-slate-200 bg-white text-slate-800 shadow-sm hover:border-slate-300 hover:bg-slate-50",
         ghost: "text-slate-700 hover:bg-slate-100",
       },
-      size: { default: "h-11 px-5", sm: "h-9 px-4 text-xs", lg: "h-13 px-7 text-base", icon: "size-11" },
+      size: { default: "h-11 px-5", sm: "h-11 px-4 text-xs sm:h-9", lg: "h-13 px-7 text-base", icon: "size-11" },
     },
     defaultVariants: { variant: "default", size: "default" },
   },

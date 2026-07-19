@@ -16,12 +16,12 @@ export function AuthShell({ children, mode }: { children: ReactNode; mode: "logi
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] lg:grid lg:grid-cols-[.92fr_1.08fr]">
-      <section className="flex min-h-screen flex-col px-5 py-6 sm:px-10 lg:px-14">
+      <section className="flex min-h-screen flex-col px-4 py-5 sm:px-10 sm:py-6 lg:px-14">
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="w-fit"><Logo /></Link>
           <LanguageSelector />
         </div>
-        <div className="mx-auto flex w-full max-w-md flex-1 items-center py-12">{children}</div>
+        <div className="mx-auto flex w-full max-w-md flex-1 items-center py-8 sm:py-12">{children}</div>
         <p className="text-center text-[10px] text-slate-400">© 2026 EcoLoop · Smart Circular Waste Management</p>
       </section>
       <aside className="relative hidden overflow-hidden bg-[#EDF6F0] lg:flex lg:flex-col lg:justify-between lg:p-10">

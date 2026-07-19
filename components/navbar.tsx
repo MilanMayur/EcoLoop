@@ -102,7 +102,7 @@ export function Navbar() {
         </div>
         <Button variant="ghost" size="icon" className="lg:hidden" aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>{open ? <X className="size-5" /> : <Menu className="size-5" />}</Button>
       </div>
-      <div id="mobile-menu" className={cn("overflow-hidden border-t border-slate-100 bg-white transition-[max-height,opacity] duration-300 lg:hidden", open ? "max-h-96 opacity-100" : "max-h-0 opacity-0")}>
+      <div id="mobile-menu" className={cn("overflow-hidden border-t border-slate-100 bg-white transition-[max-height,opacity] duration-300 lg:hidden", open ? "max-h-[calc(100dvh-5rem)] overflow-y-auto opacity-100" : "max-h-0 opacity-0")}>
         <nav className="mx-auto flex max-w-[1200px] flex-col gap-1 px-5 py-4" aria-label="Mobile navigation">
           {links.map(([label, href]) => <a className="rounded-xl px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50" href={href} key={href} onClick={() => setOpen(false)}>{label}</a>)}
           <div className="mt-3 grid grid-cols-2 gap-2">
