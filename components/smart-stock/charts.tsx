@@ -6,10 +6,28 @@ import { useAsyncResource } from "@/hooks/use-async-resource";
 
 const tooltipStyle = { borderRadius: 12, border: "1px solid #E2E8F0", boxShadow: "0 12px 30px rgba(15,23,42,.08)", fontSize: 11 };
 
+const landingInventoryDemand = [
+  { day: "Mon", inventory: 132, demand: 118 },
+  { day: "Tue", inventory: 148, demand: 126 },
+  { day: "Wed", inventory: 139, demand: 122 },
+  { day: "Thu", inventory: 158, demand: 131 },
+  { day: "Fri", inventory: 151, demand: 136 },
+  { day: "Sat", inventory: 172, demand: 154 },
+  { day: "Sun", inventory: 145, demand: 118 },
+];
+
+function InventoryDemandLines({ data }: { data: typeof landingInventoryDemand }) {
+  return <div className="h-72 min-w-0"><ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}><LineChart data={data} margin={{ top: 10, right: 8, left: -22, bottom: 0 }}><CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" opacity={.7} /><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><Tooltip contentStyle={tooltipStyle} /><Line type="monotone" dataKey="inventory" name="Inventory (kg)" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 3, fill: "#fff" }} /><Line type="monotone" dataKey="demand" name="Demand (kg)" stroke="#16A34A" strokeWidth={2.5} dot={{ r: 3, fill: "#fff" }} /></LineChart></ResponsiveContainer></div>;
+}
+
+export function LandingInventoryDemandChart() {
+  return <InventoryDemandLines data={landingInventoryDemand} />;
+}
+
 export function InventoryDemandChart() {
   const resource = useAsyncResource(() => analyticsService.getSmartStockAnalytics(), "smart-stock-charts");
   if (resource.loading || resource.error || !resource.data) return <ChartState error={Boolean(resource.error)} />;
-  return <div className="h-72 min-w-0"><ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}><LineChart data={resource.data.inventoryDemand} margin={{ top: 10, right: 8, left: -22, bottom: 0 }}><CartesianGrid vertical={false} stroke="#E2E8F0" strokeDasharray="3 3" opacity={.7} /><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} /><Tooltip contentStyle={tooltipStyle} /><Line type="monotone" dataKey="inventory" name="Inventory (kg)" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 3, fill: "#fff" }} /><Line type="monotone" dataKey="demand" name="Demand (kg)" stroke="#16A34A" strokeWidth={2.5} dot={{ r: 3, fill: "#fff" }} /></LineChart></ResponsiveContainer></div>;
+  return <InventoryDemandLines data={resource.data.inventoryDemand} />;
 }
 
 export function WasteReductionChart() {
