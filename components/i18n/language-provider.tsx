@@ -6,6 +6,7 @@ import {
   LANGUAGE_COOKIE,
   LANGUAGE_STORAGE_KEY,
   normalizeLocale,
+  supportedLocales,
   translate,
   type Locale,
 } from "@/lib/i18n";
@@ -18,7 +19,7 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 const ignoredTags = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "CODE", "PRE"]);
-const translatedAttributes = ["aria-label", "placeholder", "title"] as const;
+const translatedAttributes = ["aria-label", "alt", "placeholder", "title"] as const;
 
 export function LanguageProvider({ children, initialLocale = DEFAULT_LOCALE, hasStoredPreference = false }: { children: ReactNode; initialLocale?: Locale; hasStoredPreference?: boolean }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
@@ -58,7 +59,10 @@ export function LanguageProvider({ children, initialLocale = DEFAULT_LOCALE, has
         const current = element.getAttribute(attribute);
         if (!current) continue;
         if (!sources.has(attribute)) sources.set(attribute, current);
-        const source = sources.get(attribute) ?? current;
+        const storedSource = sources.get(attribute) ?? current;
+        const isKnownRendering = supportedLocales.some((candidateLocale) => translate(candidateLocale, storedSource) === current);
+        const source = isKnownRendering ? storedSource : current;
+        if (!isKnownRendering) sources.set(attribute, current);
         const localized = translate(locale, source);
         if (current !== localized) element.setAttribute(attribute, localized);
       }
@@ -74,8 +78,11 @@ export function LanguageProvider({ children, initialLocale = DEFAULT_LOCALE, has
         let source = storedSource ?? current;
         if (storedSource !== undefined) {
           const storedTrimmed = storedSource.trim();
-          const expected = storedTrimmed ? storedSource.replace(storedTrimmed, translate(locale, storedTrimmed)) : storedSource;
-          if (current !== expected) {
+          const isKnownRendering = supportedLocales.some((candidateLocale) => {
+            const translated = storedTrimmed ? storedSource.replace(storedTrimmed, translate(candidateLocale, storedTrimmed)) : storedSource;
+            return current === translated;
+          });
+          if (!isKnownRendering) {
             source = current;
             textSources.current.set(root, current);
           }

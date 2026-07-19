@@ -1,12 +1,10 @@
 import Image from "next/image";
-import Link from "next/link";
 import {
-  ArrowRight, BrainCircuit, Building2, Check, Clock3, GitBranch, MapPin,
-  PackageOpen, Recycle, Store, Trash2, TrendingUp, Users, Warehouse, Waves,
+  BrainCircuit, Building2, Check, Clock3, GitBranch, MapPin,
+  Recycle, Store, Trash2, TrendingUp, Users, Warehouse, Waves,
 } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
 import { CountUp, Float, PulseDot, Reveal } from "@/components/motion";
 import {
   EcoLoopAIPreview,
@@ -15,6 +13,7 @@ import {
   ThreePillarsSection,
   TransformationComparison,
 } from "@/components/landing/vision";
+import { HomepageContactActions, HomepageHeroActions, HomepageSessionProvider } from "@/components/landing/homepage-session";
 
 const problems = [
   { icon: Trash2, title: "Overflowing bins", text: "No visibility into capacity or collection demand." },
@@ -39,7 +38,7 @@ const stats = [
 
 export default function Home() {
   return (
-    <main className="overflow-hidden bg-[#F8FAFC]">
+    <HomepageSessionProvider><main className="overflow-hidden bg-[#F8FAFC]">
       <Navbar />
 
       <section id="top" className="relative min-h-screen overflow-hidden bg-[#F8FAFC] pt-28 sm:pt-32">
@@ -59,8 +58,7 @@ export default function Home() {
               EcoLoop is an AI-powered Smart Market Sustainability Platform that helps vendors optimize inventory, prevent excess stock, reduce waste, and connect with BBMP and recycling partners through one intelligent digital ecosystem.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg"><Link href="/signup">Get started <ArrowRight className="size-4" /></Link></Button>
-              <Button asChild size="lg" variant="outline"><Link href="/dashboard/vendor"><span className="grid size-6 place-items-center rounded-full bg-slate-950 text-white"><PackageOpen className="size-3" /></span> Explore dashboard</Link></Button>
+              <HomepageHeroActions />
             </div>
             <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-xs font-medium text-slate-500">
               <span className="flex items-center gap-2"><Check className="size-4 text-emerald-600" /> Built for Indian markets</span>
@@ -138,7 +136,7 @@ export default function Home() {
 
       <section id="contact" className="relative overflow-hidden border-y border-emerald-100 bg-emerald-50 py-24 sm:py-32">
         <div className="absolute left-1/2 top-1/2 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-200" aria-hidden="true" /><div className="absolute left-1/2 top-1/2 size-[20rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-200" aria-hidden="true" />
-        <Reveal className="container-page relative text-center"><span className="eyebrow"><MapPin className="size-4" /> Start with one market</span><h2 className="mx-auto mt-5 max-w-3xl text-[clamp(2.7rem,6vw,5.5rem)] font-semibold leading-[.98] tracking-[-.07em] text-slate-950">Ready to build<br />a smarter market?</h2><p className="mx-auto mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">Bring inventory intelligence, responsible waste recovery, and civic operations into one connected sustainability platform.</p><div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row"><Button asChild size="lg"><Link href="/signup">Get started <ArrowRight className="size-4" /></Link></Button><Button asChild size="lg" variant="outline"><a href="mailto:hello@ecoloop.city">Request a demo</a></Button></div></Reveal>
+        <Reveal className="container-page relative text-center"><span className="eyebrow"><MapPin className="size-4" /> Start with one market</span><h2 className="mx-auto mt-5 max-w-3xl text-[clamp(2.7rem,6vw,5.5rem)] font-semibold leading-[.98] tracking-[-.07em] text-slate-950">Ready to build<br />a smarter market?</h2><p className="mx-auto mt-6 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">Bring inventory intelligence, responsible waste recovery, and civic operations into one connected sustainability platform.</p><div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row"><HomepageContactActions /></div></Reveal>
       </section>
 
       <footer className="bg-white py-12">
@@ -151,6 +149,6 @@ export default function Home() {
           <div className="flex flex-col gap-3 pt-6 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"><p>© 2026 EcoLoop. Built for cleaner markets.</p><p>Small Stock · Zero Waste · Smart Market</p></div>
         </div>
       </footer>
-    </main>
+    </main></HomepageSessionProvider>
   );
 }
