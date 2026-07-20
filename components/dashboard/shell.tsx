@@ -15,6 +15,7 @@ import { LanguageSelector } from "@/components/i18n/language-selector";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { MobileBottomNavigation } from "@/components/dashboard/mobile-navigation";
 import { AICopilot } from "@/components/ai/copilot";
+import { DashboardProfileProvider } from "@/components/dashboard/profile-context";
 
 export function DashboardShell({ role, children }: { role: DashboardRole; children: ReactNode }) {
   const pathname = usePathname();
@@ -28,11 +29,16 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
   const [account, setAccount] = useState<CurrentProfile | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const fallbackProfile = roleProfiles[role];
+  const accountDisplayName = account
+    ? role === "recycler"
+      ? account.organization || account.name
+      : account.name || account.organization
+    : "";
   const profile = account ? {
     ...fallbackProfile,
-    name: account.name || fallbackProfile.name,
+    name: accountDisplayName || fallbackProfile.name,
     organization: account.organization || fallbackProfile.organization,
-    initials: (account.name || fallbackProfile.name).split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(),
+    initials: (accountDisplayName || fallbackProfile.name).split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(),
   } : fallbackProfile;
   const notifications = useNotifications(role);
   const searchResults = search.trim() ? navigation[role].filter((item) => item.label.toLowerCase().includes(search.trim().toLowerCase())) : [];
@@ -159,6 +165,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
   );
 
   return (
+    <DashboardProfileProvider profile={account}>
     <div className="min-h-screen bg-[#F6F8FA] text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 lg:block">{sidebar}</aside>
       <button type="button" aria-label="Close navigation" className={cn("fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-sm transition-opacity lg:hidden", mobileOpen ? "opacity-100" : "pointer-events-none opacity-0")} onClick={() => setMobileOpen(false)} />
@@ -167,7 +174,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
       {(notificationOpen || profileOpen) && <button type="button" aria-label="Close open panel" className="fixed inset-0 z-20 bg-slate-950/20 backdrop-blur-[1px] sm:hidden" onClick={() => { setNotificationOpen(false); setProfileOpen(false); }} />}
 
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-1 border-b border-slate-200/80 bg-white/90 px-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 sm:h-20 sm:gap-3 sm:px-6 lg:px-8">
+        <header className="pointer-events-auto sticky top-0 z-[70] isolate flex h-16 items-center gap-1 border-b border-slate-200/80 bg-white/90 px-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 sm:h-20 sm:gap-3 sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu className="size-5" /></Button>
           <div className="flex min-w-0 flex-1 items-center gap-2 px-1 sm:hidden">
             <Link href="/" className="shrink-0" aria-label="EcoLoop home"><Logo iconOnly compact /></Link>
@@ -224,5 +231,6 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
       <MobileBottomNavigation role={role} onNavigate={closeMobileLayers} />
       <AICopilot role={role} />
     </div>
+    </DashboardProfileProvider>
   );
 }

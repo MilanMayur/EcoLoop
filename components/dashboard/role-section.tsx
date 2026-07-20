@@ -25,6 +25,13 @@ import { useAsyncResource } from "@/hooks/use-async-resource";
 import { includesSearch, paginate } from "@/utils/table";
 import { aiService } from "@/services/ai.service";
 import type { WasteImageAnalysis } from "@/types/ai";
+import {
+  AssignmentQueuePage,
+  DriverManagementPage,
+  DriverWorkflowSection,
+  FleetOverviewPage,
+  PartnerAssignedJobsPage,
+} from "@/components/dashboard/driver-workflow";
 
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
 const labelClass = "text-xs font-semibold text-slate-700 dark:text-slate-300";
@@ -76,6 +83,10 @@ const fillLevels: Array<{ value: FillLevel; height: string }> = [
 export function RoleSection({ role, section }: { role: DashboardRole; section: string }) {
   if (role === "vendor") return <VendorSection section={section} />;
   if (role === "recycler") return <RecyclerSection section={section} />;
+  if (role === "driver") {
+    if (section === "profile") return <ProfilePage role="driver" />;
+    return <DriverWorkflowSection section={section} />;
+  }
   return <AdminSection section={section} />;
 }
 
@@ -243,16 +254,18 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
 }
 
 function RecyclerSection({ section }: { section: string }) {
-  if (section === "jobs") return <AvailableJobsPage />;
-  if (section === "accepted") return <AcceptedJobsPage />;
+  if (section === "jobs") return <AssignmentQueuePage />;
+  if (section === "accepted") return <PartnerAssignedJobsPage />;
+  if (section === "drivers") return <DriverManagementPage />;
   if (section === "history") return <RecyclerHistory />;
-  if (section === "vehicles") return <VehiclesPage />;
+  if (section === "vehicles") return <FleetOverviewPage />;
   if (section === "analytics") return <AnalyticsPage role="recycler" />;
   if (section === "profile") return <ProfilePage role="recycler" />;
   return <UnknownSection />;
 }
 
-function AvailableJobsPage() {
+/** @deprecated Retained for compatibility with older embedded recycler links. */
+export function AvailableJobsPage() {
   const resource = useAsyncResource(() => pickupService.getAvailableJobs(), "available-jobs");
   const [selected, setSelected] = useState<PickupJob | null>(null);
   const [toast, setToast] = useState("");
@@ -262,7 +275,8 @@ function AvailableJobsPage() {
   return <div className="space-y-7"><PageHeader eyebrow="Recycler network" title="Available pickup jobs" description="Opportunities matched to your accepted materials, vehicle capacity, and live location." />{resource.loading ? <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">{Array.from({length:3},(_,index)=><div key={index} className="h-64 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error ? <Panel><div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div></Panel> : jobs.length ? <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">{jobs.map(job => <article key={job.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,.04)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-slate-400">{job.id}</span><StatusBadge status={job.priority} /></div><div className="mt-5 flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><Store className="size-[18px]" /></span><div><h2 className="text-sm font-semibold">{job.vendor}</h2><p className="mt-1 flex items-center gap-1 text-[10px] text-slate-400"><MapPin className="size-3" />{job.location}</p></div></div><div className="mt-6 grid grid-cols-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-950">{[["Waste", job.waste], ["Fill level", job.fillLevel], ["Created", job.createdTime]].map(([key,value]) => <div key={key}><p className="text-[9px] uppercase tracking-wider text-slate-400">{key}</p><p className="mt-1 text-xs font-semibold">{value}</p></div>)}</div><div className="mt-5 flex gap-2"><Button className="flex-1" size="sm" disabled={accepting === job.id} onClick={() => accept(job.id)}>{accepting === job.id ? "Accepting…" : "Accept job"}</Button><Button variant="outline" size="sm" onClick={() => setSelected(job)}>View details</Button></div></article>)}</div> : <Panel><EmptyState icon={<Recycle className="size-5" />} title="No jobs available" description="New matched pickup opportunities will appear here." /></Panel>}{selected && <Panel title={`Pickup ${selected.id}`} subtitle="Review the collection before accepting"><div className="grid gap-6 p-5 lg:grid-cols-[.8fr_1.2fr]"><div className="space-y-4">{[["Waste type", selected.waste], ["Fill level", selected.fillLevel], ["Priority", selected.priority], ["Collection notes", selected.notes || "None provided"], ["Created time", selected.createdTime]].map(([key,value]) => <div key={key}><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{key}</p><p className="mt-1 text-xs font-medium">{value}</p></div>)}<Button className="w-full" disabled={accepting === selected.id} onClick={() => accept(selected.id)}>{accepting === selected.id ? "Accepting…" : "Accept this pickup"}</Button></div><div className="min-h-64 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950">{selected.imageUrl ? <Image src={selected.imageUrl} alt={`Waste for pickup ${selected.id}`} width={900} height={600} unoptimized className="h-full min-h-64 w-full object-cover" /> : <div className="grid min-h-64 place-items-center text-center text-xs text-slate-400"><div><ImagePlus className="mx-auto mb-2 size-6" />No pickup photo provided</div></div>}</div></div></Panel>}{toast && <Toast message={toast} onClose={() => setToast("")} />}</div>;
 }
 
-function AcceptedJobsPage() {
+/** @deprecated Retained for compatibility with older embedded recycler links. */
+export function AcceptedJobsPage() {
   const resource = useAsyncResource(() => pickupService.getAcceptedJobs(), "accepted-jobs");
   const [toast, setToast] = useState("");
   const [updating, setUpdating] = useState("");
@@ -296,7 +310,8 @@ function RecyclerHistory() {
   return <div className="space-y-7"><PageHeader eyebrow="Recycler network" title="Collection history" description="Completed pickups and proof-of-recovery records." /><Panel><div className="border-b border-slate-100 p-4 dark:border-slate-800"><input aria-label="Search collection history" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search collection or vendor…" className={`${inputClass} mt-0 max-w-xs`} /></div>{resource.loading ? <div className="h-56 animate-pulse bg-slate-50 dark:bg-slate-900" /> : resource.error ? <div className="p-8 text-center text-xs text-rose-600">{resource.error}</div> : rows.length ? <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left"><thead><tr className="border-b border-slate-100 text-[9px] uppercase tracking-wider text-slate-400 dark:border-slate-800">{["Collection", "Vendor", "Material", "Actual weight", "Facility", "Completion photo", "Status"].map(h => <th key={h} className="px-6 py-3">{h}</th>)}</tr></thead><tbody>{rows.map((job,i) => <tr key={`${job.id}-${i}`} className="border-b border-slate-100 last:border-0 dark:border-slate-800"><td className="px-6 py-4 text-xs font-semibold">{job.id}</td><td className="px-6 py-4 text-xs">{job.vendor}</td><td className="px-6 py-4 text-xs text-slate-500">{job.waste}</td><td className="px-6 py-4 text-xs text-slate-500">{job.actualWeight ? `${job.actualWeight} kg` : "—"}</td><td className="px-6 py-4 text-xs text-slate-500">{job.facility ?? "—"}</td><td className="px-6 py-4"><PickupPhoto url={job.completionImageUrl} alt={`Completed pickup ${job.id}`} /></td><td className="px-6 py-4"><StatusBadge status="Completed" /></td></tr>)}</tbody></table></div> : <EmptyState icon={<ClipboardCheck className="size-5" />} title="No collections found" description="Completed pickups will appear here." />}</Panel></div>;
 }
 
-function VehiclesPage() {
+/** @deprecated Retained for compatibility with older embedded recycler links. */
+export function VehiclesPage() {
   const resource = useAsyncResource(() => pickupService.getVehicles(), "vehicles");
   return <div className="space-y-7"><PageHeader eyebrow="Fleet operations" title="Vehicles" description="Capacity, driver assignment, and live availability for your collection fleet." action={<Button disabled title="Coming Soon"><Plus className="size-4" /> Add vehicle · Coming Soon</Button>} />{resource.loading ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({length:3},(_,index)=><div key={index} className="h-56 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error ? <Panel><div className="p-8 text-center text-xs text-rose-600">{resource.error}</div></Panel> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{resource.data?.map(v => <Panel key={v.id}><div className="p-5"><div className="flex justify-between"><span className="grid size-11 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10"><Truck className="size-5" /></span><StatusBadge status={v.status} /></div><h2 className="mt-6 text-sm font-semibold">{v.id}</h2><p className="mt-1 text-xs text-slate-500">Driver · {v.driver}</p><div className="mt-5 grid grid-cols-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-950"><div><p className="text-[9px] uppercase text-slate-400">Capacity</p><p className="mt-1 text-xs font-semibold">{v.capacity}</p></div><div><p className="text-[9px] uppercase text-slate-400">Current load</p><p className="mt-1 text-xs font-semibold">{v.load}</p></div></div></div></Panel>)}</div>}</div>;
 }

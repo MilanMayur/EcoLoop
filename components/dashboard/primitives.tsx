@@ -40,7 +40,7 @@ export function Panel({ children, className, title, subtitle, action }: { childr
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const style = status === "Completed" || status === "Healthy" || status === "Active" ? "bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-400" : status === "In transit" || status === "Assigned" || status === "Accepted" ? "bg-blue-50 text-blue-700 ring-blue-600/15 dark:bg-blue-500/10 dark:text-blue-400" : status === "Attention" || status === "High" || status === "Delayed" ? "bg-amber-50 text-amber-700 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-400" : "bg-slate-100 text-slate-600 ring-slate-500/15 dark:bg-slate-800 dark:text-slate-300";
+  const style = status === "Completed" || status === "Healthy" || status === "Active" || status === "Available" ? "bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-400" : status === "In transit" || status === "On route" || status === "Assigned" || status === "Accepted" || status === "Arrived" || status === "Collected" ? "bg-blue-50 text-blue-700 ring-blue-600/15 dark:bg-blue-500/10 dark:text-blue-400" : status === "Attention" || status === "High" || status === "Delayed" || status === "Batching" ? "bg-amber-50 text-amber-700 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-400" : "bg-slate-100 text-slate-600 ring-slate-500/15 dark:bg-slate-800 dark:text-slate-300";
   return <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ring-inset", style)}><span className="size-1.5 rounded-full bg-current opacity-70" />{status}</span>;
 }
 

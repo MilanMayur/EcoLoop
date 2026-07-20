@@ -1,9 +1,17 @@
 import type { DashboardRole, Metric, StockProduct } from "@/types/dashboard";
 
-export type ServiceErrorCode = "NETWORK" | "VALIDATION" | "NOT_FOUND" | "UNKNOWN";
+export type ServiceErrorCode =
+  | "NETWORK"
+  | "VALIDATION"
+  | "NOT_FOUND"
+  | "UNKNOWN";
 
 export type FillLevel = "25%" | "50%" | "75%" | "100% (Full)" | "Overflowing";
-export type PickupTimelineItem = { status: string; time: string; note?: string };
+export type PickupTimelineItem = {
+  status: string;
+  time: string;
+  note?: string;
+};
 
 export type PickupRequest = {
   id: string;
@@ -21,6 +29,13 @@ export type PickupRequest = {
   status: string;
   time: string;
   eta: string;
+  assignedDriver?: string;
+  assignedVehicle?: string;
+  assignmentTime?: string;
+  estimatedArrival?: string;
+  estimatedTravelMinutes?: number;
+  routeStopOrder?: number;
+  distanceKm?: number;
 };
 
 export type PickupJob = {
@@ -39,7 +54,24 @@ export type PickupJob = {
   createdTime: string;
   distance: string;
   priority: string;
-  status?: "Available" | "Accepted" | "In transit" | "Completed";
+  status?:
+    | "Batching"
+    | "Assigned"
+    | "Accepted"
+    | "In transit"
+    | "Arrived"
+    | "Collected"
+    | "Completed";
+  assignedDriver?: string;
+  assignedVehicle?: string;
+  assignmentTime?: string;
+  estimatedArrival?: string;
+  estimatedTravelMinutes?: number;
+  routeStopOrder?: number;
+  distanceKm?: number;
+  vendorPhone?: string;
+  vendorLatitude?: number;
+  vendorLongitude?: number;
 };
 
 export type PickupInput = {
@@ -59,10 +91,24 @@ export type PickupCompletionInput = {
 
 export type InventoryInput = Omit<StockProduct, "id" | "forecast" | "risk">;
 
-export type WasteTrendPoint = { month: string; collected: number; recycled: number };
+export type WasteTrendPoint = {
+  month: string;
+  collected: number;
+  recycled: number;
+};
 export type WasteCategoryPoint = { name: string; value: number; color: string };
-export type InventoryDemandPoint = { day: string; inventory: number; demand: number };
-export type StockImpactPoint = { month: string; waste: number; prevented: number; savings: number; accuracy: number };
+export type InventoryDemandPoint = {
+  day: string;
+  inventory: number;
+  demand: number;
+};
+export type StockImpactPoint = {
+  month: string;
+  waste: number;
+  prevented: number;
+  savings: number;
+  accuracy: number;
+};
 export type TopWastePoint = { product: string; potential: number };
 
 export type DashboardAnalytics = {
@@ -115,4 +161,64 @@ export type VehicleSummary = {
   capacity: string;
   load: string;
   status: string;
+};
+
+export type DriverStatus =
+  | "Available"
+  | "Assigned"
+  | "On route"
+  | "Offline"
+  | "Disabled"
+  | "Maintenance";
+
+export type Driver = {
+  id: string;
+  partnerId: string;
+  userId?: string;
+  name: string;
+  email?: string;
+  phone: string;
+  vehicleNumber: string;
+  vehicleType: string;
+  capacityKg: number;
+  currentLoadKg: number;
+  status: DriverStatus;
+  latitude?: number;
+  longitude?: number;
+  isAvailable: boolean;
+  compatibleWasteTypes: string[];
+  lastLocationAt?: string;
+  createdAt: string;
+};
+
+export type DriverInput = {
+  name: string;
+  email: string;
+  phone: string;
+  vehicleNumber: string;
+  vehicleType: string;
+  capacityKg: number;
+  compatibleWasteTypes: string[];
+};
+
+export type DriverPerformance = {
+  driverId: string;
+  name: string;
+  totalAssignments: number;
+  completedJobs: number;
+  averageResponseMinutes?: number;
+  averageCollectionMinutes?: number;
+  completionRate: number;
+  distanceCoveredKm: number;
+  vehicleUtilization: number;
+  wasteCollectedKg: number;
+};
+
+export type FleetOverview = {
+  totalDrivers: number;
+  availableDrivers: number;
+  activeJobs: number;
+  totalCapacityKg: number;
+  currentLoadKg: number;
+  batchingWindowSeconds: number;
 };

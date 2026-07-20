@@ -59,10 +59,12 @@ export function Navbar() {
 
   const resolvedRole = account && isHomepageRole(account.role) ? account.role : null;
   const destinations = resolvedRole ? homepageAccountLinks(resolvedRole) : null;
-  const displayName = account?.name.trim() || account?.email.split("@")[0] || "Account";
+  const displayName = resolvedRole === "recycler"
+    ? account?.organization.trim() || account?.name.trim() || account?.email.split("@")[0] || "Account"
+    : account?.name.trim() || account?.organization.trim() || account?.email.split("@")[0] || "Account";
 
   return (
-    <header className={cn("fixed inset-x-0 top-0 z-50 transition-all duration-300", scrolled && "border-b border-slate-200/70 bg-white/90 shadow-[0_8px_30px_rgba(15,23,42,.04)] backdrop-blur-xl")}>
+    <header className={cn("pointer-events-auto fixed inset-x-0 top-0 z-[100] isolate transition-all duration-300", scrolled && "border-b border-slate-200/70 bg-white/90 shadow-[0_8px_30px_rgba(15,23,42,.04)] backdrop-blur-xl")}>
       <div className="mx-auto flex h-20 max-w-[1200px] items-center justify-between px-5 sm:px-8">
         <a href="#top" onClick={() => setOpen(false)}><Logo /></a>
         <nav className="hidden items-center gap-5 lg:flex xl:gap-7" aria-label="Main navigation">
@@ -100,9 +102,9 @@ export function Navbar() {
           )}
           {resolvedRole !== "admin" && <Button asChild size="sm"><a href="#contact">Request a demo</a></Button>}
         </div>
-        <Button variant="ghost" size="icon" className="lg:hidden" aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>{open ? <X className="size-5" /> : <Menu className="size-5" />}</Button>
+        <Button variant="ghost" size="icon" className="relative z-10 lg:hidden" aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen(!open)}>{open ? <X className="size-5" /> : <Menu className="size-5" />}</Button>
       </div>
-      <div id="mobile-menu" className={cn("overflow-hidden border-t border-slate-100 bg-white transition-[max-height,opacity] duration-300 lg:hidden", open ? "max-h-[calc(100dvh-5rem)] overflow-y-auto opacity-100" : "max-h-0 opacity-0")}>
+      <div id="mobile-menu" className={cn("overflow-hidden border-t border-slate-100 bg-white transition-[max-height,opacity] duration-300 lg:hidden", open ? "pointer-events-auto max-h-[calc(100dvh-5rem)] overflow-y-auto opacity-100" : "pointer-events-none max-h-0 opacity-0")}>
         <nav className="mx-auto flex max-w-[1200px] flex-col gap-1 px-5 py-4" aria-label="Mobile navigation">
           {links.map(([label, href]) => <a className="rounded-xl px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50" href={href} key={href} onClick={() => setOpen(false)}>{label}</a>)}
           <div className="mt-3 grid grid-cols-2 gap-2">

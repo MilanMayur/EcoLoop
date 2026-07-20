@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/shell";
 import type { DashboardRole } from "@/types/dashboard";
 
-const roles: DashboardRole[] = ["vendor", "recycler", "admin"];
+const roles: DashboardRole[] = ["vendor", "recycler", "driver", "admin"];
 
 export default async function RoleLayout({ children, params }: { children: React.ReactNode; params: Promise<{ role: string }> }) {
   const { role } = await params;

@@ -9,7 +9,8 @@ import { useLanguage } from "@/components/i18n/language-provider";
 
 const mobileLabels: Record<DashboardRole, string[]> = {
   vendor: ["Dashboard", "Smart Stock", "Request pickup", "Analytics", "Profile"],
-  recycler: ["Dashboard", "Available jobs", "Accepted jobs", "Analytics", "Profile"],
+  recycler: ["Dashboard", "Assignment queue", "Assigned jobs", "Drivers", "Profile"],
+  driver: ["Dashboard", "Today's jobs", "Current route", "Completed jobs", "Profile"],
   admin: ["Overview", "Markets", "Pickup requests", "Analytics", "Settings"],
 };
 

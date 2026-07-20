@@ -37,8 +37,9 @@ const signupSchema = z.object({
 });
 
 type SignupValues = z.infer<typeof signupSchema>;
+type SignupRole = Exclude<DashboardRole, "driver">;
 
-const requiredRoleFields: Record<DashboardRole, Array<{ name: keyof SignupValues; label: string }>> = {
+const requiredRoleFields: Record<SignupRole, Array<{ name: keyof SignupValues; label: string }>> = {
   vendor: [{ name: "name", label: "Vendor name" }, { name: "shop", label: "Shop name" }, { name: "market", label: "Market name" }, { name: "shopNumber", label: "Shop number" }],
   recycler: [{ name: "company", label: "Company name" }, { name: "registration", label: "Registration number" }, { name: "categories", label: "Waste categories" }, { name: "vehicles", label: "Vehicle count" }],
   admin: [{ name: "name", label: "Officer name" }, { name: "employeeId", label: "Employee ID" }, { name: "zone", label: "Zone" }],
@@ -54,7 +55,7 @@ export function SignupForm() {
   const router = useRouter();
   const { locale } = useLanguage();
   const [step, setStep] = useState(1);
-  const [role, setRole] = useState<DashboardRole | null>(null);
+  const [role, setRole] = useState<SignupRole | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const form = useForm<SignupValues>({ resolver: zodResolver(signupSchema), defaultValues: { phone: "", email: "", password: "", confirmPassword: "", categories: "", zone: "" } });

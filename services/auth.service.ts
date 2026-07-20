@@ -37,7 +37,7 @@ const MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
 const PROFILE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const isRole = (value: unknown): value is DashboardRole =>
-  value === "vendor" || value === "recycler" || value === "admin";
+  value === "vendor" || value === "recycler" || value === "driver" || value === "admin";
 
 const requireAuthClient = () => {
   const supabase = getSupabaseClient();

@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { authService, type CurrentProfile } from "@/services/auth.service";
 import type { DashboardRole } from "@/types/dashboard";
 
-export type HomepageAccount = Pick<CurrentProfile, "email" | "name" | "role">;
+export type HomepageAccount = Pick<CurrentProfile, "email" | "name" | "organization" | "role">;
 
 const HomepageAccountContext = createContext<HomepageAccount | null | undefined>(undefined);
 
 export const isHomepageRole = (value: unknown): value is DashboardRole =>
-  value === "vendor" || value === "recycler" || value === "admin";
+  value === "vendor" || value === "recycler" || value === "driver" || value === "admin";
 
 export const homepageAccountLinks = (role: DashboardRole) => ({
   dashboard: `/dashboard/${role}`,
@@ -36,12 +36,13 @@ export function HomepageSessionProvider({ children }: { children: ReactNode }) {
 
         try {
           const profile = await authService.getCurrentProfile();
-          if (active) setAccount({ name: profile.name, email: profile.email, role: profile.role });
+          if (active) setAccount({ name: profile.name, organization: profile.organization, email: profile.email, role: profile.role });
         } catch {
           if (!active) return;
           const metadata = session.user.user_metadata;
           setAccount({
             name: String(metadata?.full_name ?? session.user.email?.split("@")[0] ?? "Account"),
+            organization: String(metadata?.organization_name ?? metadata?.company ?? ""),
             email: String(session.user.email ?? ""),
             role: isHomepageRole(metadata?.role) ? metadata.role : null,
           });

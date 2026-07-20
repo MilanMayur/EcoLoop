@@ -13,7 +13,7 @@ const PICKUP_IMAGE_BUCKET = "pickup-images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-type PickupStatus = "pending" | "assigned" | "accepted" | "in_transit" | "completed" | "cancelled";
+type PickupStatus = "pending" | "assigned" | "accepted" | "in_transit" | "arrived" | "collected" | "completed" | "cancelled";
 
 type PickupRow = {
   id: string;
@@ -31,6 +31,11 @@ type PickupRow = {
   status: PickupStatus;
   recycler_id: string | null;
   created_at: string;
+  assigned_driver_id: string | null;
+  assigned_vehicle: string | null;
+  assignment_time: string | null;
+  estimated_arrival: string | null;
+  route_stop_order: number | null;
 };
 
 type HistoryRow = {
@@ -59,6 +64,8 @@ const statusLabel = (status: PickupStatus) => ({
   assigned: "Assigned",
   accepted: "Accepted",
   in_transit: "In transit",
+  arrived: "Arrived",
+  collected: "Collected",
   completed: "Completed",
   cancelled: "Cancelled",
 })[status];
@@ -79,10 +86,13 @@ const requestFromRow = (row: PickupRow, history: HistoryRow[] = []): PickupReque
   facility: row.facility ?? undefined,
   notes: row.notes ?? undefined,
   timeline: timelineFor(row, history),
-  recycler: row.recycler_id ? "Verified recycling partner" : "Matching in progress",
+  recycler: row.assigned_driver_id ? "Assigned driver" : row.recycler_id ? "Verified recycling partner" : "Batching nearby requests",
   status: statusLabel(row.status),
   time: relativeTime(row.created_at),
-  eta: row.status === "accepted" ? "18 min" : row.status === "in_transit" ? "6 min" : "—",
+  eta: row.estimated_arrival ? new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(new Date(row.estimated_arrival)) : row.status === "pending" ? "Matching shortly" : "—",
+  assignedVehicle: row.assigned_vehicle ?? undefined,
+  estimatedArrival: row.estimated_arrival ?? undefined,
+  routeStopOrder: row.route_stop_order ?? undefined,
 });
 
 const jobFromRow = (row: PickupRow): PickupJob => ({
@@ -100,10 +110,13 @@ const jobFromRow = (row: PickupRow): PickupJob => ({
   createdTime: relativeTime(row.created_at),
   distance: "Nearby",
   priority: row.priority,
-  status: row.status === "pending" ? "Available" : statusLabel(row.status) as PickupJob["status"],
+  status: row.status === "pending" ? "Batching" : statusLabel(row.status) as PickupJob["status"],
+  assignedVehicle: row.assigned_vehicle ?? undefined,
+  estimatedArrival: row.estimated_arrival ?? undefined,
+  routeStopOrder: row.route_stop_order ?? undefined,
 });
 
-const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, recycler_id, created_at";
+const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, recycler_id, created_at, assigned_driver_id, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order";
 
 const pickupId = async (referenceCode: string) => {
   const supabase = requirePickupClient();
@@ -152,7 +165,7 @@ export const pickupService = {
     const supabase = requirePickupClient();
     const user = await requireUser(supabase);
     const { data: profile, error: profileError } = await supabase.from("profiles")
-      .select("full_name, organization_name, market_id").eq("id", user.id).single();
+      .select("full_name, organization_name, phone, market_id").eq("id", user.id).single();
     throwDatabaseError(profileError, "Your vendor profile could not be loaded.");
     if (!profile) throw new ServiceError("Your vendor profile could not be loaded.", 404);
 
@@ -161,6 +174,7 @@ export const pickupService = {
       market_id: profile.market_id,
       vendor_name: profile.full_name,
       location: profile.organization_name,
+      vendor_phone: profile.phone,
       waste_type: payload.wasteType,
       fill_level: payload.fillLevel,
       priority: payload.priority,
@@ -189,12 +203,8 @@ export const pickupService = {
   },
 
   async acceptPickup(referenceCode: string) {
-    const supabase = requirePickupClient();
-    await requireUser(supabase);
-    const id = await pickupId(referenceCode);
-    const { data, error } = await supabase.rpc("accept_pickup", { p_pickup_id: id });
-    throwDatabaseError(error, "This pickup could not be accepted.");
-    return jobFromRow(data as PickupRow);
+    void referenceCode;
+    throw new ServiceError("Pickup jobs are assigned automatically to eligible drivers after the batching window.", 409);
   },
 
   async startPickup(referenceCode: string) {

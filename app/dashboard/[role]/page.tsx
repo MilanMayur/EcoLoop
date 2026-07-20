@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { RoleOverview } from "@/components/dashboard/role-overview";
 import type { DashboardRole } from "@/types/dashboard";
 
-const roles: DashboardRole[] = ["vendor", "recycler", "admin"];
+const roles: DashboardRole[] = ["vendor", "recycler", "driver", "admin"];
 
 export default async function DashboardPage({ params }: { params: Promise<{ role: string }> }) {
   const { role } = await params;
