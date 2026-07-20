@@ -156,7 +156,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
           );
         })}
       </nav>
-      <div className="m-4 hidden shrink-0 rounded-2xl bg-slate-950 p-4 text-white dark:bg-emerald-950 sm:block">
+      <div className="m-4 mt-0 shrink-0 rounded-2xl bg-slate-950 p-4 text-white dark:bg-emerald-950">
         <span className="grid size-8 place-items-center rounded-lg bg-white/10"><HelpCircle className="size-4 text-emerald-400" /></span>
         <p className="mt-4 text-xs font-semibold">Need a hand?</p><p className="mt-1 text-[10px] leading-4 text-slate-400">Talk to EcoLoop support or view the help centre.</p>
         <button disabled title="Coming Soon" className="mt-3 cursor-not-allowed text-[10px] font-semibold text-slate-500">Help centre · Coming Soon</button>
@@ -196,7 +196,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
                 {notifications.unread > 0 && <span className="absolute right-1.5 top-1 grid min-w-4 place-items-center rounded-full border-2 border-white bg-emerald-500 px-0.5 text-[8px] font-bold leading-3 text-white dark:border-slate-950">{notifications.unread}</span>}
               </Button>
               {notificationOpen && (
-                <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 max-h-[65dvh] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-12 sm:w-[min(22rem,calc(100vw-2rem))] sm:shadow-xl">
+                <div className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-[90] max-h-[calc(100dvh-5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-12 sm:w-[min(22rem,calc(100vw-2rem))] sm:shadow-xl">
                   <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                     <div><p className="text-xs font-semibold">Notifications</p><p className="mt-1 text-[9px] text-slate-400">{notifications.unread} unread update{notifications.unread === 1 ? "" : "s"}</p></div>
                     <div className="flex items-center gap-1"><button type="button" disabled={!notifications.unread} onClick={() => notifications.markAllAsRead()} className="min-h-11 px-2 text-[9px] font-semibold text-emerald-600 disabled:text-slate-300">Mark all read</button><Button type="button" variant="ghost" size="icon" className="sm:hidden" onClick={() => setNotificationOpen(false)} aria-label="Close notifications"><X className="size-4" /></Button></div>
@@ -209,12 +209,12 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
             <LanguageSelector compact persistToProfile className="border-0 bg-transparent shadow-none sm:hidden" />
 
             <div className="relative">
-              <button onClick={() => { setProfileOpen(!profileOpen); setNotificationOpen(false); }} className="flex size-11 items-center justify-center rounded-xl transition hover:bg-slate-50 dark:hover:bg-slate-900 sm:w-auto sm:gap-2 sm:p-1.5 sm:pr-2" aria-label="Open profile menu" aria-expanded={profileOpen}>
+              <button type="button" onClick={() => { setProfileOpen(!profileOpen); setNotificationOpen(false); }} className="flex size-11 items-center justify-center rounded-xl transition hover:bg-slate-50 dark:hover:bg-slate-900 sm:w-auto sm:gap-2 sm:p-1.5 sm:pr-2" aria-label="Open profile menu" aria-expanded={profileOpen}>
                 <span className="grid size-8 place-items-center rounded-lg bg-emerald-600 text-[10px] font-bold text-white">{profile.initials}</span>
                 <span className="hidden text-left md:block"><span className="block text-xs font-semibold text-slate-800 dark:text-white">{profile.name}</span><span className="block text-[9px] text-slate-400">{profile.shortRole}</span></span><ChevronDown className="hidden size-3.5 text-slate-400 md:block" />
               </button>
               {profileOpen && (
-                <div className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-12 sm:w-64 sm:shadow-xl">
+                <div className="fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top))] z-[90] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-12 sm:w-64 sm:shadow-xl">
                   <div className="flex items-center gap-3 border-b border-slate-100 px-3 py-3 dark:border-slate-800"><span className="grid size-10 place-items-center rounded-xl bg-emerald-600 text-xs font-bold text-white">{profile.initials}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{profile.name}</p><p className="mt-1 truncate text-[10px] text-slate-400">{profile.organization}</p></div><Button type="button" variant="ghost" size="icon" className="sm:hidden" onClick={() => setProfileOpen(false)} aria-label="Close profile menu"><X className="size-4" /></Button></div>
                   <Link href={profileHref} onClick={closeMobileLayers} className="mt-1 flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">View profile and settings</Link>
                   <button type="button" onClick={toggleDark} className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-xs text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800 sm:hidden">{dark ? <Sun className="size-4" /> : <Moon className="size-4" />}{dark ? "Use light mode" : "Use dark mode"}</button>

@@ -68,6 +68,8 @@ const driverSelect =
   "id, partner_id, user_id, name, email, phone, vehicle_number, vehicle_type, capacity_kg, current_load, status, current_latitude, current_longitude, is_available, compatible_waste_types, last_location_at, created_at";
 const jobSelect =
   "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, created_at, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude, vendor_phone, assigned_driver:drivers!pickup_requests_assigned_driver_id_fkey(name), pickup_assignments(distance_km, released_at, assigned_at)";
+const jobSelectWithoutAssignmentHistory =
+  "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, created_at, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude, vendor_phone, assigned_driver:drivers!pickup_requests_assigned_driver_id_fkey(name)";
 
 const client = () => {
   const supabase = optionalSupabase();
@@ -334,21 +336,34 @@ export const driverService = {
   async getAssignedJobs(scope: "driver" | "partner" = "driver") {
     const supabase = client();
     const user = await requireUser(supabase);
-    let query = supabase
-      .from("pickup_requests")
-      .select(jobSelect)
-      .in("status", [
-        "assigned",
-        "accepted",
-        "in_transit",
-        "arrived",
-        "collected",
-      ])
-      .order("route_stop_order");
-    if (scope === "partner") query = query.eq("recycler_id", user.id);
-    const { data, error } = await query;
+    const buildQuery = (select: string) => {
+      let query = supabase
+        .from("pickup_requests")
+        .select(select)
+        .in("status", [
+          "assigned",
+          "accepted",
+          "in_transit",
+          "arrived",
+          "collected",
+        ])
+        .order("route_stop_order");
+      if (scope === "partner") query = query.eq("recycler_id", user.id);
+      return query;
+    };
+    let { data, error } = await buildQuery(jobSelect);
+    // Supabase can briefly retain a stale relationship cache after the driver
+    // migration. The core assignment card does not depend on that nested data.
+    if (
+      error &&
+      (error.code === "PGRST200" ||
+        error.code === "PGRST201" ||
+        error.code === "PGRST204")
+    ) {
+      ({ data, error } = await buildQuery(jobSelectWithoutAssignmentHistory));
+    }
     throwDatabaseError(error, "Assigned jobs could not be loaded.");
-    return (data as DriverJobRow[]).map(jobFromRow);
+    return (data as unknown as DriverJobRow[]).map(jobFromRow);
   },
 
   async getCompletedJobs() {
