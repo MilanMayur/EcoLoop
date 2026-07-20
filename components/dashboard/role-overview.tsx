@@ -9,6 +9,7 @@ import type { DashboardRole } from "@/types/dashboard";
 import type { DashboardAnalytics, MarketSummary, PickupJob, PickupRequest } from "@/types/mvp";
 import { analyticsService } from "@/services/analytics.service";
 import { useAsyncResource } from "@/hooks/use-async-resource";
+import { DashboardAIInsights } from "@/components/ai/dashboard-insights";
 
 const copy = {
   vendor: { eyebrow: "Fresh Veg Stall 18", title: "Good morning, Anita", description: "Your waste operations are on track. Two pickups are scheduled for today.", action: "Request pickup", href: "/dashboard/vendor/request-pickup" },
@@ -38,6 +39,7 @@ function DashboardContent({ role, data }: { role: DashboardRole; data: Dashboard
   return (
     <>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">{data.metrics.map((metric, index) => <MetricCard key={metric.label} metric={metric} index={index} />)}</div>
+      <DashboardAIInsights role={role} data={data} />
       {role === "vendor" && <VendorOverview requests={data.recentRequests} />}
       {role === "recycler" && <RecyclerOverview jobs={data.jobs} />}
       {role === "admin" && <AdminOverview extraMetrics={data.extraMetrics} markets={data.markets} />}

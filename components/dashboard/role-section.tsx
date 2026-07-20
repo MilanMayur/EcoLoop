@@ -23,6 +23,8 @@ import { authService } from "@/services/auth.service";
 import { pickupService } from "@/services/pickup.service";
 import { useAsyncResource } from "@/hooks/use-async-resource";
 import { includesSearch, paginate } from "@/utils/table";
+import { aiService } from "@/services/ai.service";
+import type { WasteImageAnalysis } from "@/types/ai";
 
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
 const labelClass = "text-xs font-semibold text-slate-700 dark:text-slate-300";
@@ -84,10 +86,12 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 function PhotoUploadField({ label, helper, onChange }: { label: string; helper: string; onChange: (file: File | null) => void }) {
   const [preview, setPreview] = useState("");
   const [fileError, setFileError] = useState("");
+  const [analysis, setAnalysis] = useState<WasteImageAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
-  const chooseFile = (file?: File) => {
+  const chooseFile = async (file?: File) => {
     setFileError("");
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -100,25 +104,38 @@ function PhotoUploadField({ label, helper, onChange }: { label: string; helper: 
     }
     setPreview(URL.createObjectURL(file));
     onChange(file);
+    if (label.toLowerCase().includes("pickup photo")) {
+      setAnalyzing(true);
+      setAnalysis(null);
+      try {
+        const result = await aiService.analyzeWasteImage(file);
+        setAnalysis(result);
+        window.dispatchEvent(new CustomEvent<WasteImageAnalysis>("ecoloop:waste-analysis", { detail: result }));
+      } catch (error) {
+        setFileError(error instanceof Error ? error.message : "AI image analysis is temporarily unavailable.");
+      } finally { setAnalyzing(false); }
+    }
   };
 
   return (
     <div>
       <p className={labelClass}>{label}</p>
-      <div className="mt-2 grid gap-3 min-[430px]:grid-cols-2">
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+      <div className="mt-1.5 grid grid-cols-2 gap-2 sm:mt-2 sm:gap-3">
+        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-2 py-3 text-[10px] font-semibold text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 sm:gap-2 sm:px-4 sm:py-4 sm:text-xs">
           <ImagePlus className="size-4 text-emerald-600" /> Capture Photo
           <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(event) => chooseFile(event.target.files?.[0])} />
         </label>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-2 py-3 text-[10px] font-semibold text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 sm:gap-2 sm:px-4 sm:py-4 sm:text-xs">
           <Upload className="size-4 text-blue-600" /> Upload Photo
           <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => chooseFile(event.target.files?.[0])} />
         </label>
       </div>
       <p className="mt-2 text-[10px] leading-4 text-slate-400">{helper}</p>
       <p className="mt-1 text-[10px] text-slate-400">JPG, PNG, or WEBP · maximum 5 MB</p>
+      {analyzing && <p className="mt-2 animate-pulse text-[10px] font-medium text-emerald-600">EcoLoop AI is assessing the waste image…</p>}
+      {analysis && <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[10px] leading-4 text-emerald-800"><p className="font-semibold">AI estimate: {analysis.detectedWasteType} · {analysis.estimatedFillLevel} · {Math.round(analysis.confidence)}% confidence</p><p className="mt-1">{analysis.explanation} You can edit the selections above.</p></div>}
       {fileError && <p role="alert" className="mt-2 text-[10px] text-rose-600">{fileError}</p>}
-      {preview && <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950"><Image src={preview} alt={`${label} preview`} width={720} height={420} unoptimized className="max-h-64 w-full object-contain" /></div>}
+      {preview && <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950 sm:mt-4 sm:rounded-2xl"><Image src={preview} alt={`${label} preview`} width={720} height={420} unoptimized className="max-h-40 w-full object-contain sm:max-h-64" /></div>}
     </div>
   );
 }
@@ -133,7 +150,7 @@ function VendorSection({ section }: { section: string }) {
 
 function PickupPhoto({ url, alt }: { url?: string; alt: string }) {
   if (!url) return <span className="text-[10px] text-slate-400">Not provided</span>;
-  return <a href={url} target="_blank" rel="noreferrer" className="block w-fit overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"><Image src={url} alt={alt} width={72} height={54} unoptimized className="h-12 w-16 object-cover" /></a>;
+  return <a href={url} target="_blank" rel="noreferrer" className="block w-fit overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"><Image src={url} alt={alt} width={72} height={54} unoptimized className="h-10 w-14 object-cover sm:h-12 sm:w-16" /></a>;
 }
 
 function PickupForm() {
@@ -144,6 +161,17 @@ function PickupForm() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PickupInputValues, unknown, PickupValues>({ resolver: zodResolver(pickupSchema), defaultValues: { priority: "Normal", notes: "" } });
+  useEffect(() => {
+    const applyAnalysis = (event: Event) => {
+      const result = (event as CustomEvent<WasteImageAnalysis>).detail;
+      const detected = result.detectedWasteType.toLowerCase();
+      const matched = detected.includes("plastic") ? "Plastic" : detected.includes("metal") ? "Metal" : detected.includes("organic") || detected.includes("wet") || detected.includes("food") ? "Wet" : detected.includes("dry") || detected.includes("paper") ? "Dry" : "Mixed";
+      setWasteType(matched);
+      setFillLevel(result.estimatedFillLevel);
+    };
+    window.addEventListener("ecoloop:waste-analysis", applyAnalysis);
+    return () => window.removeEventListener("ecoloop:waste-analysis", applyAnalysis);
+  }, []);
   const submit = async (values: PickupValues) => {
     setError("");
     try {
@@ -158,7 +186,7 @@ function PickupForm() {
       setError(reason instanceof Error ? reason.message : "We couldn’t create this pickup request.");
     }
   };
-  return <div className="space-y-7"><PageHeader eyebrow="Vendor operations" title="Request a pickup" description="Tell us what is ready. EcoLoop will match the right authorized recycler and optimize the route." /><form onSubmit={handleSubmit(submit)} className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]" noValidate><Panel title="Pickup details" subtitle="Required fields are marked with an asterisk"><div className="space-y-6 p-5 sm:p-6"><fieldset><legend className={labelClass}>Waste type *</legend><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">{["Wet", "Dry", "Plastic", "Metal", "Mixed"].map(type => <button type="button" key={type} onClick={() => setWasteType(type)} className={cn("rounded-xl border px-3 py-4 text-center text-xs font-semibold transition", wasteType === type ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-4 ring-emerald-500/10 dark:bg-emerald-500/10 dark:text-emerald-400" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950")}><span className="mx-auto mb-2 grid size-8 place-items-center rounded-lg bg-current/5"><Trash2 className="size-4" /></span>{type}</button>)}</div></fieldset><fieldset><legend className={labelClass}>Bin fill level *</legend><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">{fillLevels.map((level) => <button type="button" key={level.value} aria-pressed={fillLevel === level.value} onClick={() => setFillLevel(level.value)} className={cn("rounded-xl border px-3 py-4 text-center text-xs font-semibold transition", fillLevel === level.value ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-4 ring-emerald-500/10 dark:bg-emerald-500/10 dark:text-emerald-400" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950")}><span className="relative mx-auto mb-2 block h-9 w-7 overflow-hidden rounded-md border-2 border-current"><span className="absolute inset-x-0 bottom-0 bg-emerald-500/70" style={{ height: level.height }} />{level.value === "Overflowing" && <span className="absolute inset-x-0 -top-1 text-sm leading-none">+</span>}</span>{level.value}</button>)}</div></fieldset><label className={labelClass}>Priority *<select {...register("priority")} className={inputClass}><option>Normal</option><option>Urgent — within 2 hours</option><option>Scheduled</option></select></label><label className={labelClass}>Collection notes<textarea {...register("notes")} rows={4} placeholder="Access instructions, packaging details, or preferred pickup time…" className={`${inputClass} h-auto resize-none py-3`} />{errors.notes && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.notes.message}</span>}</label><PhotoUploadField key={photoKey} label="Pickup photo (optional, recommended)" helper="A photo helps the recycling partner assess the waste and prepare the appropriate vehicle." onChange={setPhoto} /></div></Panel><div className="space-y-5"><Panel title="Pickup location"><div className="p-5"><div className="flex items-start gap-3 rounded-xl bg-slate-50 p-4 dark:bg-slate-950"><MapPin className="mt-0.5 size-4 text-emerald-600" /><div><p className="text-xs font-semibold">Fresh Veg Stall 18</p><p className="mt-1 text-[10px] leading-4 text-slate-500">Block C, Chandapura Market<br />Bengaluru 560099</p></div></div><button type="button" disabled title="Coming Soon" className="mt-3 cursor-not-allowed text-[10px] font-semibold text-slate-400">Change pickup location · Coming Soon</button></div></Panel><Panel><div className="p-5"><div className="flex gap-3"><ShieldCheck className="size-5 shrink-0 text-blue-500" /><div><p className="text-xs font-semibold">Verified collection only</p><p className="mt-1 text-[10px] leading-4 text-slate-500">Your request is visible only to authorized recycling partners.</p></div></div>{error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-[10px] text-rose-600">{error}</p>}<Button type="submit" className="mt-6 w-full" disabled={isSubmitting}>{isSubmitting ? "Creating request…" : "Submit pickup request"}<ChevronRight className="size-4" /></Button></div></Panel></div></form>{toast && <Toast message={toast} onClose={() => setToast("")} />}</div>;
+  return <div className="space-y-4 sm:space-y-7"><PageHeader eyebrow="Vendor operations" title="Request a pickup" description="Tell us what is ready. EcoLoop will match the right authorized recycler and optimize the route." /><form onSubmit={handleSubmit(submit)} className="grid gap-3 sm:gap-5 xl:grid-cols-[1.35fr_.65fr]" noValidate><Panel title="Pickup details" subtitle="Required fields are marked with an asterisk"><div className="space-y-4 p-4 sm:space-y-6 sm:p-6"><fieldset><legend className={labelClass}>Waste type *</legend><div className="mt-2 grid grid-cols-3 gap-2 sm:mt-3 sm:grid-cols-5 sm:gap-3">{["Wet", "Dry", "Plastic", "Metal", "Mixed"].map(type => <button type="button" key={type} onClick={() => setWasteType(type)} className={cn("rounded-xl border px-2 py-3 text-center text-[10px] font-semibold transition sm:px-3 sm:py-4 sm:text-xs", wasteType === type ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-4 ring-emerald-500/10 dark:bg-emerald-500/10 dark:text-emerald-400" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950")}><span className="mx-auto mb-1 grid size-7 place-items-center rounded-lg bg-current/5 sm:mb-2 sm:size-8"><Trash2 className="size-4" /></span>{type}</button>)}</div></fieldset><fieldset><legend className={labelClass}>Bin fill level *</legend><div className="mt-2 grid grid-cols-3 gap-2 sm:mt-3 sm:grid-cols-5 sm:gap-3">{fillLevels.map((level) => <button type="button" key={level.value} aria-pressed={fillLevel === level.value} onClick={() => setFillLevel(level.value)} className={cn("rounded-xl border px-2 py-3 text-center text-[10px] font-semibold transition sm:px-3 sm:py-4 sm:text-xs", fillLevel === level.value ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-4 ring-emerald-500/10 dark:bg-emerald-500/10 dark:text-emerald-400" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950")}><span className="relative mx-auto mb-1 block h-7 w-6 overflow-hidden rounded-md border-2 border-current sm:mb-2 sm:h-9 sm:w-7"><span className="absolute inset-x-0 bottom-0 bg-emerald-500/70" style={{ height: level.height }} />{level.value === "Overflowing" && <span className="absolute inset-x-0 -top-1 text-sm leading-none">+</span>}</span>{level.value}</button>)}</div></fieldset><label className={labelClass}>Priority *<select {...register("priority")} className={`${inputClass} mt-1.5 h-10 text-sm sm:mt-2 sm:h-11`}><option>Normal</option><option>Urgent — within 2 hours</option><option>Scheduled</option></select></label><label className={labelClass}>Collection notes<textarea {...register("notes")} rows={3} placeholder="Access instructions, packaging details, or preferred pickup time…" className={`${inputClass} mt-1.5 h-auto resize-none py-2.5 text-sm sm:mt-2 sm:py-3`} />{errors.notes && <span className="mt-1 block text-[10px] text-rose-600 sm:mt-1.5">{errors.notes.message}</span>}</label><PhotoUploadField key={photoKey} label="Pickup photo (optional, recommended)" helper="A photo helps the recycling partner assess the waste and prepare the appropriate vehicle." onChange={setPhoto} /></div></Panel><div className="space-y-3 sm:space-y-5"><Panel title="Pickup location"><div className="p-4 sm:p-5"><div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3 dark:bg-slate-950 sm:gap-3 sm:p-4"><MapPin className="mt-0.5 size-4 text-emerald-600" /><div><p className="text-xs font-semibold">Fresh Veg Stall 18</p><p className="mt-1 text-[10px] leading-4 text-slate-500">Block C, Chandapura Market<br />Bengaluru 560099</p></div></div><button type="button" disabled title="Coming Soon" className="mt-2 cursor-not-allowed text-[10px] font-semibold text-slate-400 sm:mt-3">Change pickup location · Coming Soon</button></div></Panel><Panel><div className="p-4 sm:p-5"><div className="flex gap-2.5 sm:gap-3"><ShieldCheck className="size-5 shrink-0 text-blue-500" /><div><p className="text-xs font-semibold">Verified collection only</p><p className="mt-1 text-[10px] leading-4 text-slate-500">Your request is visible only to authorized recycling partners.</p></div></div>{error && <p role="alert" className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-[10px] text-rose-600 sm:mt-4">{error}</p>}<Button type="submit" className="mt-4 w-full sm:mt-6" disabled={isSubmitting}>{isSubmitting ? "Creating request…" : "Submit pickup request"}<ChevronRight className="size-4" /></Button></div></Panel></div></form>{toast && <Toast message={toast} onClose={() => setToast("")} />}</div>;
 }
 
 function RequestsPage({ history, admin = false }: { history: boolean; admin?: boolean }) {
@@ -177,16 +205,16 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
     ? ["Request ID", "Waste type", "Fill level", "Actual weight", "Pickup photo", "Completion photo", "Status", "Status timeline"]
     : ["Request ID", "Waste type", "Fill level", "Actual weight", "Assigned recycler", "Status", "Created time", "ETA"];
   return (
-    <div className="space-y-5 sm:space-y-7">
+    <div className="space-y-4 sm:space-y-7">
       <PageHeader eyebrow={admin ? "BBMP operations" : "Vendor operations"} title={history ? "Pickup history" : admin ? "Pickup requests" : "My requests"} description={history ? "A complete, auditable record of recovered waste." : admin ? "Live status and SLA visibility across all connected markets." : "Track live pickup status, assigned partners, and arrival estimates."} action={!history && !admin && <Button asChild><Link href="/dashboard/vendor/request-pickup"><Plus className="size-4" /> New request</Link></Button>} />
       <Panel>
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 dark:border-slate-800 sm:flex-row">
-          <input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search request ID…" className={`${inputClass} mt-0 sm:max-w-xs`} />
-          <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)} className={`${inputClass} mt-0 sm:ml-auto sm:w-40`}><option>All statuses</option><option>Pending</option><option>Assigned</option><option>In transit</option><option>Completed</option></select>
-          <select aria-label="Sort requests" value={sort} onChange={(event) => setSort(event.target.value)} className={`${inputClass} mt-0 sm:w-32`}><option>Newest</option><option>Oldest</option></select>
+        <div className="grid grid-cols-2 gap-2 border-b border-slate-100 p-3 dark:border-slate-800 sm:flex sm:gap-3 sm:p-4">
+          <input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search request ID…" className={`${inputClass} col-span-2 mt-0 h-10 text-sm sm:max-w-xs`} />
+          <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)} className={`${inputClass} mt-0 h-10 text-sm sm:ml-auto sm:w-40`}><option>All statuses</option><option>Pending</option><option>Assigned</option><option>In transit</option><option>Completed</option></select>
+          <select aria-label="Sort requests" value={sort} onChange={(event) => setSort(event.target.value)} className={`${inputClass} mt-0 h-10 text-sm sm:w-32`}><option>Newest</option><option>Oldest</option></select>
         </div>
-        {resource.loading ? <div className="h-56 animate-pulse bg-slate-50 dark:bg-slate-900" /> : resource.error ? <div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div> : pageInfo.rows.length ? <>
-          <div className="grid gap-2.5 p-3 sm:hidden">{pageInfo.rows.map((item) => <article key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-950/50"><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Pickup request</p><h3 className="mt-1 text-xs font-semibold">{item.id}</h3></div><StatusBadge status={item.status} /></div><div className="mt-3 grid grid-cols-2 gap-3 text-[10px]"><div><p className="text-slate-400">Waste type</p><p className="mt-1 font-semibold">{item.waste}</p></div><div><p className="text-slate-400">Fill level</p><p className="mt-1 font-semibold">{item.fillLevel}</p></div><div><p className="text-slate-400">Actual weight</p><p className="mt-1 font-semibold">{item.actualWeight ? `${item.actualWeight} kg` : "Pending"}</p></div><div><p className="text-slate-400">Requested</p><p className="mt-1 font-semibold">{item.time}</p></div></div>{admin ? <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3 dark:border-slate-800"><PickupPhoto url={item.imageUrl} alt={`Pickup ${item.id}`} /><PickupPhoto url={item.completionImageUrl} alt={`Completed pickup ${item.id}`} /><span className="ml-auto text-[10px] text-slate-400">Pickup · Completion</span></div> : <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-[10px] dark:border-slate-800"><span className="text-slate-400">{item.recycler}</span><span className="font-semibold">ETA {item.eta}</span></div>}</article>)}</div>
+        {resource.loading ? <div className="h-40 animate-pulse bg-slate-50 dark:bg-slate-900 sm:h-56" /> : resource.error ? <div className="p-5 text-center sm:p-8"><p className="text-[11px] text-rose-600 sm:text-xs">{resource.error}</p><Button size="sm" variant="outline" className="mt-3 sm:mt-4" onClick={resource.reload}>Try again</Button></div> : pageInfo.rows.length ? <>
+          <div className="grid gap-2 p-2.5 sm:hidden">{pageInfo.rows.map((item) => <article key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/50"><div className="flex items-start justify-between gap-2"><div><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Pickup request</p><h3 className="mt-0.5 text-xs font-semibold">{item.id}</h3></div><StatusBadge status={item.status} /></div><div className="mt-2.5 grid grid-cols-2 gap-2 text-[10px]"><div><p className="text-slate-400">Waste type</p><p className="mt-0.5 font-semibold">{item.waste}</p></div><div><p className="text-slate-400">Fill level</p><p className="mt-0.5 font-semibold">{item.fillLevel}</p></div><div><p className="text-slate-400">Actual weight</p><p className="mt-0.5 font-semibold">{item.actualWeight ? `${item.actualWeight} kg` : "Pending"}</p></div><div><p className="text-slate-400">Requested</p><p className="mt-0.5 font-semibold">{item.time}</p></div></div>{admin ? <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800"><PickupPhoto url={item.imageUrl} alt={`Pickup ${item.id}`} /><PickupPhoto url={item.completionImageUrl} alt={`Completed pickup ${item.id}`} /><span className="ml-auto text-[9px] text-slate-400">Pickup · Completion</span></div> : <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[10px] dark:border-slate-800"><span className="truncate text-slate-400">{item.recycler}</span><span className="shrink-0 font-semibold">ETA {item.eta}</span></div>}</article>)}</div>
           <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[1050px] text-left">
             <thead><tr className="border-b border-slate-100 text-[9px] uppercase tracking-wider text-slate-400 dark:border-slate-800">{headers.map((heading) => <th key={heading} className="px-6 py-3 font-semibold">{heading}</th>)}</tr></thead>
             <tbody>{pageInfo.rows.map((item) => <tr key={item.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
@@ -300,7 +328,7 @@ function PartnersPage() {
 
 function AnalyticsPage({ role }: { role: DashboardRole }) {
   const resource = useAsyncResource(() => analyticsService.getDashboard(role), `analytics-${role}`);
-  return <div className="space-y-7"><PageHeader eyebrow={`${roleProfiles[role].shortRole} intelligence`} title="Analytics" description="Clear trends and measurable environmental outcomes from your EcoLoop activity." />{resource.loading ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({length:4},(_,index)=><div key={index} className="h-32 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error || !resource.data ? <Panel><div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error || "Analytics are temporarily unavailable."}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div></Panel> : <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{resource.data.metrics.map((metric) => <div key={metric.label} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><p className="text-2xl font-semibold tracking-[-.04em]">{metric.value}</p><p className="mt-2 text-xs text-slate-500">{metric.label}</p><p className="mt-4 text-[10px] font-medium text-emerald-600">{metric.change}</p></div>)}</div><div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]"><Panel title="Monthly waste trend" subtitle="Collection and recovery volume"><div className="p-4 sm:p-6"><WasteTrendChart mode="line" /></div></Panel><Panel title="Material distribution" subtitle="Share by weight"><div className="p-4 sm:p-6"><WasteDonutChart /></div></Panel></div><Panel title={role === "admin" ? "Market comparison" : "Performance details"}><div className="p-4 sm:p-6"><WasteTrendChart /></div></Panel></>}</div>;
+  return <div className="space-y-4 sm:space-y-7"><PageHeader eyebrow={`${roleProfiles[role].shortRole} intelligence`} title="Analytics" description="Clear trends and measurable environmental outcomes from your EcoLoop activity." />{resource.loading ? <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">{Array.from({length:4},(_,index)=><div key={index} className="h-24 animate-pulse rounded-xl bg-white dark:bg-slate-900 sm:h-32 sm:rounded-2xl" />)}</div> : resource.error || !resource.data ? <Panel><div className="p-5 text-center sm:p-8"><p className="text-[11px] text-rose-600 sm:text-xs">{resource.error || "Analytics are temporarily unavailable."}</p><Button size="sm" variant="outline" className="mt-3 sm:mt-4" onClick={resource.reload}>Try again</Button></div></Panel> : <><div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">{resource.data.metrics.map((metric) => <div key={metric.label} className="rounded-xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl sm:p-5"><p className="text-xl font-semibold tracking-[-.04em] sm:text-2xl">{metric.value}</p><p className="mt-1 text-[10px] leading-4 text-slate-500 sm:mt-2 sm:text-xs">{metric.label}</p><p className="mt-2 text-[9px] font-medium text-emerald-600 sm:mt-4 sm:text-[10px]">{metric.change}</p></div>)}</div><div className="grid gap-3 sm:gap-5 xl:grid-cols-[1.35fr_.65fr]"><Panel title="Monthly waste trend" subtitle="Collection and recovery volume"><div className="p-3 sm:p-6"><WasteTrendChart mode="line" compactOnMobile /></div></Panel><Panel title="Material distribution" subtitle="Share by weight"><div className="p-3 sm:p-6"><WasteDonutChart compactOnMobile /></div></Panel></div><Panel title={role === "admin" ? "Market comparison" : "Performance details"}><div className="p-3 sm:p-6"><WasteTrendChart compactOnMobile /></div></Panel></>}</div>;
 }
 
 function ReportsPage() {
@@ -321,6 +349,18 @@ function ReportsPage() {
     const key = `${title}-${format}`;
     setGenerating(key);
     try {
+      if (format === "dashboard") {
+        const dashboard = await analyticsService.getDashboard("admin");
+        const report = await aiService.generateWeeklyReport("admin", "weekly", { metrics: dashboard.metrics.map(({ label, value, change }) => ({ label, value, change })), wasteTrend: dashboard.wasteTrend, wasteCategories: dashboard.wasteCategories, markets: dashboard.markets, recentRequests: dashboard.recentRequests.slice(0, 10) });
+        const text = `${report.title}\n\n${report.summary}\n\nHighlights\n${report.highlights.map((item) => `• ${item}`).join("\n")}\n\nRisks\n${report.risks.map((item) => `• ${item}`).join("\n")}\n\nRecommendations\n${report.recommendations.map((item) => `• ${item}`).join("\n")}\n\nGenerated ${new Date(report.generatedAt).toLocaleString("en-IN")}`;
+        const filename = `ecoloop-ai-weekly-report-${new Date().toISOString().slice(0, 10)}.txt`;
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        download(blob, filename);
+        if (navigator.clipboard) await navigator.clipboard.writeText(text).catch(() => undefined);
+        setReports((current) => [{ filename, title: report.title, format: "AI summary", createdAt: new Date().toLocaleString("en-IN"), blob }, ...current]);
+        setToast(`${filename} downloaded${navigator.clipboard ? " and copied" : ""}.`);
+        return;
+      }
       const result = await analyticsService.generateReport(format, title);
       download(result.blob, result.filename);
       setReports((current) => [{ filename: result.filename, title, format: format === "CSV" ? "CSV" : "PDF", createdAt: new Date().toLocaleString("en-IN"), blob: result.blob }, ...current]);
@@ -402,39 +442,39 @@ function AdminSettingsPage() {
     }
   };
 
-  if (loadingProfile) return <div className="space-y-7"><PageHeader eyebrow="Workspace administration" title="Settings" description="Manage account details, notification preferences, and security." /><div className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]"><div className="h-64 animate-pulse rounded-2xl bg-white dark:bg-slate-900" /><div className="h-80 animate-pulse rounded-2xl bg-white dark:bg-slate-900" /></div></div>;
+  if (loadingProfile) return <div className="space-y-4 sm:space-y-7"><PageHeader eyebrow="Workspace administration" title="Settings" description="Manage account details, notification preferences, and security." /><div className="grid gap-3 sm:gap-5 xl:grid-cols-[.7fr_1.3fr]"><div className="h-40 animate-pulse rounded-xl bg-white dark:bg-slate-900 sm:h-64 sm:rounded-2xl" /><div className="h-64 animate-pulse rounded-xl bg-white dark:bg-slate-900 sm:h-80 sm:rounded-2xl" /></div></div>;
 
   const displayName = current?.name || "BBMP account";
   const imageUrl = profileImagePreview || current?.profileImageUrl;
   const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "BA";
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-4 sm:space-y-7">
       <PageHeader eyebrow="Workspace administration" title="Settings" description="Manage account details, notification preferences, and security." />
-      <form onSubmit={handleSubmit(submit)} className="grid gap-5 xl:grid-cols-[.7fr_1.3fr]" noValidate>
+      <form onSubmit={handleSubmit(submit)} className="grid gap-3 sm:gap-5 xl:grid-cols-[.7fr_1.3fr]" noValidate>
         <Panel>
-          <div className="p-6 text-center">
-            {imageUrl ? <Image src={imageUrl} alt={`${displayName} profile`} width={80} height={80} unoptimized className="mx-auto size-20 rounded-2xl object-cover" /> : <span className="mx-auto grid size-20 place-items-center rounded-2xl bg-emerald-600 text-xl font-bold text-white">{initials}</span>}
-            <h2 className="mt-4 text-sm font-semibold">{displayName}</h2>
+          <div className="p-4 text-center sm:p-6">
+            {imageUrl ? <Image src={imageUrl} alt={`${displayName} profile`} width={80} height={80} unoptimized className="mx-auto size-16 rounded-xl object-cover sm:size-20 sm:rounded-2xl" /> : <span className="mx-auto grid size-16 place-items-center rounded-xl bg-emerald-600 text-lg font-bold text-white sm:size-20 sm:rounded-2xl sm:text-xl">{initials}</span>}
+            <h2 className="mt-2.5 text-sm font-semibold sm:mt-4">{displayName}</h2>
             <p className="mt-1 text-xs text-slate-500">{current?.market || "BBMP administrator"}</p>
             <StatusBadge status="Active" />
-            <label className="mx-auto mt-4 flex w-fit cursor-pointer items-center gap-2 text-[10px] font-semibold text-emerald-600"><Upload className="size-3.5" /> Upload profile image<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => selectProfileImage(event.target.files?.[0])} /></label>
+            <label className="mx-auto mt-2.5 flex w-fit cursor-pointer items-center gap-1.5 text-[10px] font-semibold text-emerald-600 sm:mt-4 sm:gap-2"><Upload className="size-3.5" /> Upload profile image<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => selectProfileImage(event.target.files?.[0])} /></label>
             <p className="mt-1 text-[9px] text-slate-400">JPG, PNG, or WEBP · maximum 5 MB</p>
           </div>
         </Panel>
-        <div className="space-y-5">
+        <div className="space-y-3 sm:space-y-5">
           <Panel title="Profile details">
-            <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
-              <label className={labelClass}>Full name<input {...register("name")} className={inputClass} />{errors.name && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.name.message}</span>}</label>
-              <label className={labelClass}>Employee ID<input value={current?.officeId || "Not provided during signup"} readOnly aria-readonly="true" className={`${inputClass} cursor-not-allowed bg-slate-50 text-slate-500 dark:bg-slate-900`} /></label>
-              <label className={labelClass}>Zone or operating area<input {...register("market")} className={inputClass} />{errors.market && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.market.message}</span>}</label>
-              <label className={labelClass}>Phone<input {...register("phone")} className={inputClass} />{errors.phone && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.phone.message}</span>}</label>
-              <label className={labelClass}>Email<input {...register("email")} type="email" className={inputClass} />{errors.email && <span className="mt-1.5 block text-[10px] text-rose-600">{errors.email.message}</span>}</label>
+            <div className="grid gap-3 p-4 sm:grid-cols-2 sm:gap-4 sm:p-6">
+              <label className={labelClass}>Full name<input {...register("name")} className={`${inputClass} mt-1.5 h-10 text-sm sm:mt-2 sm:h-11`} />{errors.name && <span className="mt-1 block text-[10px] text-rose-600 sm:mt-1.5">{errors.name.message}</span>}</label>
+              <label className={labelClass}>Employee ID<input value={current?.officeId || "Not provided during signup"} readOnly aria-readonly="true" className={`${inputClass} mt-1.5 h-10 cursor-not-allowed bg-slate-50 text-sm text-slate-500 dark:bg-slate-900 sm:mt-2 sm:h-11`} /></label>
+              <label className={labelClass}>Zone or operating area<input {...register("market")} className={`${inputClass} mt-1.5 h-10 text-sm sm:mt-2 sm:h-11`} />{errors.market && <span className="mt-1 block text-[10px] text-rose-600 sm:mt-1.5">{errors.market.message}</span>}</label>
+              <label className={labelClass}>Phone<input {...register("phone")} className={`${inputClass} mt-1.5 h-10 text-sm sm:mt-2 sm:h-11`} />{errors.phone && <span className="mt-1 block text-[10px] text-rose-600 sm:mt-1.5">{errors.phone.message}</span>}</label>
+              <label className={labelClass}>Email<input {...register("email")} type="email" className={`${inputClass} mt-1.5 h-10 text-sm sm:mt-2 sm:h-11`} />{errors.email && <span className="mt-1 block text-[10px] text-rose-600 sm:mt-1.5">{errors.email.message}</span>}</label>
             </div>
           </Panel>
-          <Panel title="Security"><div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6"><span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10"><KeyRound className="size-[18px]" /></span><div className="flex-1"><p className="text-xs font-semibold">Password</p><p className="mt-1 text-[10px] text-slate-400">Use the login page if you need to reset your password.</p></div><Button type="button" size="sm" variant="outline" asChild><Link href="/login">Reset password</Link></Button></div></Panel>
-          {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
-          <Button type="submit" disabled={isSubmitting || !current}><Save className="size-4" /> {isSubmitting ? "Saving…" : "Save changes"}</Button>
+          <Panel title="Security"><div className="p-4 sm:flex sm:items-center sm:gap-4 sm:p-6"><div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 sm:size-10 sm:rounded-xl"><KeyRound className="size-4 sm:size-[18px]" /></span><div className="flex-1"><p className="text-xs font-semibold">Password</p><p className="mt-0.5 text-[10px] leading-4 text-slate-400 sm:mt-1">Use the login page if you need to reset your password.</p></div></div><Button type="button" size="sm" variant="outline" className="mt-3 w-full sm:mt-0 sm:w-auto" asChild><Link href="/login">Reset password</Link></Button></div></Panel>
+          {error && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2.5 text-[11px] text-rose-700 sm:px-4 sm:py-3 sm:text-xs">{error}</p>}
+          <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting || !current}><Save className="size-4" /> {isSubmitting ? "Saving…" : "Save changes"}</Button>
         </div>
       </form>
       {toast && <Toast message={toast} onClose={() => setToast("")} />}

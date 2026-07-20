@@ -14,6 +14,7 @@ import { authService, type CurrentProfile } from "@/services/auth.service";
 import { LanguageSelector } from "@/components/i18n/language-selector";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { MobileBottomNavigation } from "@/components/dashboard/mobile-navigation";
+import { AICopilot } from "@/components/ai/copilot";
 
 export function DashboardShell({ role, children }: { role: DashboardRole; children: ReactNode }) {
   const pathname = usePathname();
@@ -168,9 +169,9 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
       <div className="lg:pl-64">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-1 border-b border-slate-200/80 bg-white/90 px-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90 sm:h-20 sm:gap-3 sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu className="size-5" /></Button>
-          <div className="min-w-0 flex-1 px-1 sm:hidden">
-            <p className="truncate text-[10px] font-bold uppercase tracking-[.12em] text-emerald-600">EcoLoop</p>
-            <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{t(currentPage?.label ?? roleLabels[role])}</p>
+          <div className="flex min-w-0 flex-1 items-center gap-2 px-1 sm:hidden">
+            <Link href="/" className="shrink-0" aria-label="EcoLoop home"><Logo iconOnly compact /></Link>
+            <div className="min-w-0"><p className="truncate text-[10px] font-bold uppercase tracking-[.12em] text-emerald-600">EcoLoop</p><p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{t(currentPage?.label ?? roleLabels[role])}</p></div>
           </div>
           <div className="relative hidden max-w-sm flex-1 sm:block">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -221,6 +222,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
       </div>
 
       <MobileBottomNavigation role={role} onNavigate={closeMobileLayers} />
+      <AICopilot role={role} />
     </div>
   );
 }
