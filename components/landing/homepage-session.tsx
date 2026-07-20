@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { authService, type CurrentProfile } from "@/services/auth.service";
 import type { DashboardRole } from "@/types/dashboard";
 
-export type HomepageAccount = Pick<CurrentProfile, "email" | "name" | "organization" | "role">;
+export type HomepageAccount = Pick<CurrentProfile, "email" | "name" | "organization" | "role" | "requestedRole">;
 
 const HomepageAccountContext = createContext<HomepageAccount | null | undefined>(undefined);
 
@@ -18,6 +18,9 @@ export const homepageAccountLinks = (role: DashboardRole) => ({
   dashboard: `/dashboard/${role}`,
   profile: role === "admin" ? "/dashboard/admin/settings" : `/dashboard/${role}/profile`,
 });
+
+export const homepageDashboardRole = (account: HomepageAccount): DashboardRole =>
+  isHomepageRole(account.role) ? account.role : account.requestedRole;
 
 export function HomepageSessionProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<HomepageAccount | null | undefined>(undefined);
@@ -36,7 +39,7 @@ export function HomepageSessionProvider({ children }: { children: ReactNode }) {
 
         try {
           const profile = await authService.getCurrentProfile();
-          if (active) setAccount({ name: profile.name, organization: profile.organization, email: profile.email, role: profile.role });
+          if (active) setAccount({ name: profile.name, organization: profile.organization, email: profile.email, role: profile.role, requestedRole: profile.requestedRole });
         } catch {
           if (!active) return;
           const metadata = session.user.user_metadata;
@@ -45,6 +48,11 @@ export function HomepageSessionProvider({ children }: { children: ReactNode }) {
             organization: String(metadata?.organization_name ?? metadata?.company ?? ""),
             email: String(session.user.email ?? ""),
             role: isHomepageRole(metadata?.role) ? metadata.role : null,
+            requestedRole: isHomepageRole(metadata?.requested_role)
+              ? metadata.requested_role
+              : isHomepageRole(metadata?.role)
+                ? metadata.role
+                : "vendor",
           });
         }
       } catch {
@@ -90,8 +98,8 @@ export function HomepageHeroActions() {
   const account = useHomepageAccount();
   if (account === undefined) return <LoadingActions />;
 
-  if (account && isHomepageRole(account.role)) {
-    return <Button asChild size="lg"><Link href={homepageAccountLinks(account.role).dashboard}><LayoutDashboard className="size-4" /> Explore dashboard</Link></Button>;
+  if (account) {
+    return <Button asChild size="lg"><Link href={homepageAccountLinks(homepageDashboardRole(account)).dashboard}><LayoutDashboard className="size-4" /> Explore dashboard</Link></Button>;
   }
 
   return (
@@ -106,8 +114,8 @@ export function HomepageContactActions() {
   const account = useHomepageAccount();
   if (account === undefined) return <LoadingActions />;
 
-  if (account && isHomepageRole(account.role)) {
-    return <Button asChild size="lg"><Link href={homepageAccountLinks(account.role).dashboard}><LayoutDashboard className="size-4" /> Explore dashboard</Link></Button>;
+  if (account) {
+    return <Button asChild size="lg"><Link href={homepageAccountLinks(homepageDashboardRole(account)).dashboard}><LayoutDashboard className="size-4" /> Explore dashboard</Link></Button>;
   }
 
   return (

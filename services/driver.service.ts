@@ -252,29 +252,22 @@ export const driverService = {
 
   async getFleetOverview(): Promise<FleetOverview> {
     const supabase = client();
-    const drivers = await this.getDrivers();
-    const [{ count: activeJobs, error }, { data: config }] = await Promise.all([
-      supabase
-        .from("pickup_requests")
-        .select("id", { count: "exact", head: true })
-        .in("status", [
-          "assigned",
-          "accepted",
-          "in_transit",
-          "arrived",
-          "collected",
-        ]),
-      supabase
-        .from("smart_assignment_config")
-        .select("batching_window_seconds")
-        .eq("id", true)
-        .single(),
+    const [drivers, activeJobs] = await Promise.all([
+      this.getDrivers(),
+      // Reuse the role-scoped job query used by the assigned-jobs panel. This
+      // avoids a separate aggregate request failing when Supabase is still
+      // refreshing its schema cache after the driver migration.
+      this.getAssignedJobs("partner"),
     ]);
-    throwDatabaseError(error, "Fleet activity could not be loaded.");
+    const { data: config } = await supabase
+      .from("smart_assignment_config")
+      .select("batching_window_seconds")
+      .eq("id", true)
+      .maybeSingle();
     return {
       totalDrivers: drivers.length,
       availableDrivers: drivers.filter((item) => item.isAvailable).length,
-      activeJobs: activeJobs ?? 0,
+      activeJobs: activeJobs.length,
       totalCapacityKg: drivers.reduce((sum, item) => sum + item.capacityKg, 0),
       currentLoadKg: drivers.reduce((sum, item) => sum + item.currentLoadKg, 0),
       batchingWindowSeconds: Number(config?.batching_window_seconds ?? 30),

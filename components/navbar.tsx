@@ -7,7 +7,7 @@ import { ChevronDown, CircleUserRound, LayoutDashboard, LogOut, Menu, Settings, 
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/i18n/language-selector";
-import { homepageAccountLinks, isHomepageRole, useHomepageAccount } from "@/components/landing/homepage-session";
+import { homepageAccountLinks, homepageDashboardRole, useHomepageAccount } from "@/components/landing/homepage-session";
 import { cn } from "@/lib/utils";
 import { authService } from "@/services/auth.service";
 
@@ -57,7 +57,7 @@ export function Navbar() {
     }
   };
 
-  const resolvedRole = account && isHomepageRole(account.role) ? account.role : null;
+  const resolvedRole = account ? homepageDashboardRole(account) : null;
   const destinations = resolvedRole ? homepageAccountLinks(resolvedRole) : null;
   const displayName = resolvedRole === "recycler"
     ? account?.organization.trim() || account?.name.trim() || account?.email.split("@")[0] || "Account"
