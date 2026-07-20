@@ -6,6 +6,7 @@ import {
   FileBarChart,
   History,
   LayoutDashboard,
+  LifeBuoy,
   MapPinned,
   Navigation,
   PackageOpen,
@@ -165,6 +166,7 @@ export const navigation: Record<DashboardRole, NavItem[]> = {
     },
     { label: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
     { label: "Reports", href: "/dashboard/admin/reports", icon: FileBarChart },
+    { label: "Support requests", href: "/dashboard/admin/support", icon: LifeBuoy },
     { label: "Settings", href: "/dashboard/admin/settings", icon: Settings },
   ],
 };

@@ -17,6 +17,7 @@ import {
   throwDatabaseError,
 } from "@/services/supabase.data";
 import { ServiceError } from "@/services/service-error";
+import { isWithinOperatingHours } from "@/lib/operating-hours";
 
 type AnalyticsPickup = {
   id: string;
@@ -40,6 +41,8 @@ type AnalyticsPickup = {
   assigned_vehicle: string | null;
   estimated_arrival: string | null;
   route_stop_order: number | null;
+  vendor_latitude: number | null;
+  vendor_longitude: number | null;
 };
 
 type RecoveryRow = {
@@ -87,6 +90,12 @@ const requestFromRow = (row: AnalyticsPickup): PickupRequest => ({
     .map((word) => word[0].toUpperCase() + word.slice(1))
     .join(" "),
   time: relativeTime(row.created_at),
+  assignedDriverId: row.assigned_driver_id ?? undefined,
+  assignedVehicle: row.assigned_vehicle ?? undefined,
+  estimatedArrival: row.estimated_arrival ?? undefined,
+  routeStopOrder: row.route_stop_order ?? undefined,
+  vendorLatitude: row.vendor_latitude ?? undefined,
+  vendorLongitude: row.vendor_longitude ?? undefined,
   eta:
     row.status === "accepted"
       ? "18 min"
@@ -123,8 +132,11 @@ const jobFromRow = (row: AnalyticsPickup): PickupJob => ({
     } as Record<string, PickupJob["status"]>
   )[row.status],
   assignedVehicle: row.assigned_vehicle ?? undefined,
+  assignedDriverId: row.assigned_driver_id ?? undefined,
   estimatedArrival: row.estimated_arrival ?? undefined,
   routeStopOrder: row.route_stop_order ?? undefined,
+  vendorLatitude: row.vendor_latitude ?? undefined,
+  vendorLongitude: row.vendor_longitude ?? undefined,
 });
 
 const chartsFromRows = (rows: AnalyticsPickup[]) => {
@@ -176,7 +188,7 @@ const chartsFromRows = (rows: AnalyticsPickup[]) => {
 };
 
 const pickupSelect =
-  "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, image_url, completion_image_url, facility, notes, priority, status, recycler_id, market_id, created_at, completed_at, assigned_driver_id, assigned_vehicle, estimated_arrival, route_stop_order";
+  "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, image_url, completion_image_url, facility, notes, priority, status, recycler_id, market_id, created_at, completed_at, assigned_driver_id, assigned_vehicle, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude";
 
 type ReportFormat = "PDF" | "CSV" | "dashboard";
 
@@ -312,7 +324,7 @@ export const analyticsService = {
                 "Assigned to your route",
                 "Next route position",
                 "Recorded today",
-                "Current assigned load",
+                "Measured onboard load",
               ]
             : [
                 "Created today",
@@ -371,10 +383,13 @@ export const analyticsService = {
           String(completedToday.length),
           `${recyclingRate}%`,
           String(
-            (driverData ?? []).filter(
-              (driver) =>
-                driver.status !== "Disabled" && driver.status !== "Offline",
-            ).length,
+            isWithinOperatingHours()
+              ? (driverData ?? []).filter(
+                  (driver) =>
+                    driver.status !== "Disabled" &&
+                    driver.status !== "Offline",
+                ).length
+              : 0,
           ),
         ][index];
       return { ...metric, value, change: metricChanges[index] };

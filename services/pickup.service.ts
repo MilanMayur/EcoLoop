@@ -8,6 +8,7 @@ import type {
 } from "@/types/mvp";
 import { ServiceError } from "@/services/service-error";
 import { optionalSupabase, relativeTime, requireUser, throwDatabaseError } from "@/services/supabase.data";
+import { isWithinOperatingHours } from "@/lib/operating-hours";
 
 const PICKUP_IMAGE_BUCKET = "pickup-images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -36,6 +37,8 @@ type PickupRow = {
   assignment_time: string | null;
   estimated_arrival: string | null;
   route_stop_order: number | null;
+  vendor_latitude: number | null;
+  vendor_longitude: number | null;
 };
 
 type HistoryRow = {
@@ -86,13 +89,31 @@ const requestFromRow = (row: PickupRow, history: HistoryRow[] = []): PickupReque
   facility: row.facility ?? undefined,
   notes: row.notes ?? undefined,
   timeline: timelineFor(row, history),
-  recycler: row.assigned_driver_id ? "Assigned driver" : row.recycler_id ? "Verified recycling partner" : "Batching nearby requests",
+  recycler: row.assigned_driver_id
+    ? "Assigned driver"
+    : row.recycler_id
+      ? "Verified recycling partner"
+      : isWithinOperatingHours()
+        ? "Batching nearby requests"
+        : "Queued for the 6:00 AM shift",
   status: statusLabel(row.status),
   time: relativeTime(row.created_at),
-  eta: row.estimated_arrival ? new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(new Date(row.estimated_arrival)) : row.status === "pending" ? "Matching shortly" : "—",
+  eta: row.estimated_arrival
+    ? new Intl.DateTimeFormat("en-IN", {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(row.estimated_arrival))
+    : row.status === "pending"
+      ? isWithinOperatingHours()
+        ? "Matching shortly"
+        : "After 6:00 AM"
+      : "—",
   assignedVehicle: row.assigned_vehicle ?? undefined,
+  assignedDriverId: row.assigned_driver_id ?? undefined,
   estimatedArrival: row.estimated_arrival ?? undefined,
   routeStopOrder: row.route_stop_order ?? undefined,
+  vendorLatitude: row.vendor_latitude ?? undefined,
+  vendorLongitude: row.vendor_longitude ?? undefined,
 });
 
 const jobFromRow = (row: PickupRow): PickupJob => ({
@@ -112,11 +133,14 @@ const jobFromRow = (row: PickupRow): PickupJob => ({
   priority: row.priority,
   status: row.status === "pending" ? "Batching" : statusLabel(row.status) as PickupJob["status"],
   assignedVehicle: row.assigned_vehicle ?? undefined,
+  assignedDriverId: row.assigned_driver_id ?? undefined,
   estimatedArrival: row.estimated_arrival ?? undefined,
   routeStopOrder: row.route_stop_order ?? undefined,
+  vendorLatitude: row.vendor_latitude ?? undefined,
+  vendorLongitude: row.vendor_longitude ?? undefined,
 });
 
-const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, recycler_id, created_at, assigned_driver_id, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order";
+const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, recycler_id, created_at, assigned_driver_id, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude";
 
 const pickupId = async (referenceCode: string) => {
   const supabase = requirePickupClient();
@@ -127,6 +151,21 @@ const pickupId = async (referenceCode: string) => {
 };
 
 export const pickupService = {
+  subscribeToRequests(onChange: () => void) {
+    const supabase = requirePickupClient();
+    const channel = supabase
+      .channel(`pickup-requests:${crypto.randomUUID()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pickup_requests" },
+        onChange,
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  },
+
   async uploadPickupImage(file: File, purpose: "pickup" | "completion" = "pickup") {
     if (!IMAGE_TYPES.includes(file.type)) throw new ServiceError("Use a JPG, PNG, or WEBP image.", 400);
     if (file.size > MAX_IMAGE_SIZE) throw new ServiceError("The image must be 5 MB or smaller.", 400);

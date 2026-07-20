@@ -12,7 +12,6 @@ import {
   ClipboardCheck,
   Clock3,
   Gauge,
-  LocateFixed,
   Mail,
   MapPin,
   Navigation,
@@ -26,6 +25,7 @@ import {
   Truck,
   UserRound,
   UsersRound,
+  Warehouse,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -41,6 +41,9 @@ import { driverService } from "@/services/driver.service";
 import { pickupService } from "@/services/pickup.service";
 import type { Driver, DriverInput, PickupJob } from "@/types/mvp";
 import { cn } from "@/lib/utils";
+import { LivePickupTracking } from "@/components/dashboard/live-tracking";
+import { usePickupRealtime } from "@/hooks/use-pickup-realtime";
+import { OPERATING_HOURS_LABEL } from "@/lib/operating-hours";
 
 const inputClass =
   "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
@@ -61,13 +64,19 @@ const driverSchema = z.object({
 type DriverValues = z.infer<typeof driverSchema>;
 type DriverInputValues = z.input<typeof driverSchema>;
 
-const completionSchema = z.object({
+const collectionSchema = z.object({
   actualWeight: z.coerce.number().positive("Enter the measured weight."),
+  notes: z.string().trim().max(500).optional(),
+});
+type CollectionValues = z.infer<typeof collectionSchema>;
+type CollectionInputValues = z.input<typeof collectionSchema>;
+
+const unloadSchema = z.object({
   facility: z.string().trim().min(2, "Enter the destination facility."),
   notes: z.string().trim().max(500).optional(),
 });
-type CompletionValues = z.infer<typeof completionSchema>;
-type CompletionInputValues = z.input<typeof completionSchema>;
+type UnloadValues = z.infer<typeof unloadSchema>;
+type UnloadInputValues = z.input<typeof unloadSchema>;
 
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   return (
@@ -98,10 +107,12 @@ export function AssignmentQueuePage() {
     () => driverService.getAssignedJobs("partner"),
     "assignment-queue-jobs",
   );
+  usePickupRealtime(assignments.reload);
   const [processing, setProcessing] = useState(false);
   const [savingWindow, setSavingWindow] = useState(false);
   const [batchingWindowOverride, setBatchingWindowOverride] = useState<number | null>(null);
   const batchingWindow = batchingWindowOverride ?? overview.data?.batchingWindowSeconds ?? 30;
+  const operatingNow = overview.data?.operatingNow ?? true;
   const [toast, setToast] = useState("");
   const process = async () => {
     setProcessing(true);
@@ -149,7 +160,7 @@ export function AssignmentQueuePage() {
     "Pickup request received",
     `Wait ${batchingWindow} seconds`,
     "Group nearby market requests",
-    "Score available drivers",
+    "Score active trucks",
     "Assign driver and route order",
   ];
   return (
@@ -157,7 +168,7 @@ export function AssignmentQueuePage() {
       <PageHeader
         eyebrow="Smart logistics"
         title="Assignment queue"
-        description="EcoLoop batches nearby requests before selecting the best available driver."
+        description={`EcoLoop assigns queued requests during operating hours (${OPERATING_HOURS_LABEL}).`}
         action={
           <div className="flex w-full gap-2 sm:w-auto">
             <label className="sr-only" htmlFor="batching-window">
@@ -177,10 +188,19 @@ export function AssignmentQueuePage() {
             <Button
               className="flex-1 sm:flex-none"
               onClick={() => void process()}
-              disabled={processing}
+              disabled={processing || !operatingNow}
+              title={
+                operatingNow
+                  ? "Process ready pickup batches"
+                  : `Assignments resume at 6:00 AM IST (${OPERATING_HOURS_LABEL})`
+              }
             >
               <Route className="size-4" />
-              {processing ? "Processing…" : "Process ready batches"}
+              {processing
+                ? "Processing…"
+                : operatingNow
+                  ? "Process ready batches"
+                  : "Assignments paused"}
             </Button>
           </div>
         }
@@ -190,7 +210,7 @@ export function AssignmentQueuePage() {
           [
             ["Batching window", `${batchingWindow}s`, Clock3],
             [
-              "Available drivers",
+              "Active trucks",
               overview.data?.availableDrivers ?? 0,
               UsersRound,
             ],
@@ -407,9 +427,12 @@ export function DriverManagementPage() {
                   </div>
                   <div className="mt-3">
                     <div className="flex justify-between text-[9px] text-slate-400">
-                      <span>Current load</span>
+                      <span>Onboard load</span>
                       <span>{load}%</span>
                     </div>
+                    <p className="mt-1.5 text-[9px] text-slate-400">
+                      {driver.currentLoadKg} kg onboard · {driver.reservedLoadKg} kg reserved
+                    </p>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
                         className="h-full rounded-full bg-emerald-500"
@@ -609,6 +632,7 @@ export function PartnerAssignedJobsPage() {
     () => driverService.getAssignedJobs("partner"),
     "partner-assigned-jobs",
   );
+  usePickupRealtime(resource.reload);
   return (
     <div className="space-y-4 sm:space-y-7">
       <PageHeader
@@ -634,7 +658,23 @@ export function RecyclerFleetOverview({ jobs }: { jobs: PickupJob[] }) {
   const ordered = [...jobs].sort(
     (a, b) => (a.routeStopOrder ?? 99) - (b.routeStopOrder ?? 99),
   );
+  const trackedJob = ordered.find(
+    (job) =>
+      job.assignedDriverId &&
+      ["Assigned", "Accepted", "In transit", "Arrived", "Collected"].includes(
+        job.status ?? "",
+      ),
+  );
   return (
+    <div className="space-y-4 sm:space-y-5">
+      {trackedJob && (
+        <LivePickupTracking
+          driverId={trackedJob.assignedDriverId}
+          status={trackedJob.status}
+          destinationLatitude={trackedJob.vendorLatitude}
+          destinationLongitude={trackedJob.vendorLongitude}
+        />
+      )}
     <div className="grid gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
       <Panel
         title="Active driver assignments"
@@ -676,7 +716,7 @@ export function RecyclerFleetOverview({ jobs }: { jobs: PickupJob[] }) {
       </Panel>
       <Panel
         title="Fleet availability"
-        subtitle="Current driver and vehicle status"
+        subtitle={`Operating hours: ${OPERATING_HOURS_LABEL}`}
       >
         {fleet.loading ? (
           <div className="h-44 animate-pulse bg-slate-50 dark:bg-slate-950" />
@@ -692,7 +732,7 @@ export function RecyclerFleetOverview({ jobs }: { jobs: PickupJob[] }) {
                   {fleet.data.availableDrivers}
                 </p>
                 <p className="mt-1 text-[10px] text-slate-400">
-                  Available drivers
+                  Active trucks
                 </p>
               </div>
               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
@@ -701,9 +741,9 @@ export function RecyclerFleetOverview({ jobs }: { jobs: PickupJob[] }) {
               </div>
             </div>
             <div className="mt-4 flex items-center justify-between text-[10px]">
-              <span className="text-slate-400">Assigned fleet load</span>
+              <span className="text-slate-400">Onboard · reserved</span>
               <span className="font-semibold">
-                {Math.round(fleet.data.currentLoadKg)} /{" "}
+                {Math.round(fleet.data.currentLoadKg)} kg · {Math.round(fleet.data.reservedLoadKg)} kg /{" "}
                 {Math.round(fleet.data.totalCapacityKg)} kg
               </span>
             </div>
@@ -711,7 +751,7 @@ export function RecyclerFleetOverview({ jobs }: { jobs: PickupJob[] }) {
               <div
                 className="h-full rounded-full bg-emerald-500"
                 style={{
-                  width: `${fleet.data.totalCapacityKg ? Math.min(100, (fleet.data.currentLoadKg / fleet.data.totalCapacityKg) * 100) : 0}%`,
+                  width: `${fleet.data.totalCapacityKg ? Math.min(100, ((fleet.data.currentLoadKg + fleet.data.reservedLoadKg) / fleet.data.totalCapacityKg) * 100) : 0}%`,
                 }}
               />
             </div>
@@ -721,6 +761,7 @@ export function RecyclerFleetOverview({ jobs }: { jobs: PickupJob[] }) {
           </div>
         )}
       </Panel>
+    </div>
     </div>
   );
 }
@@ -812,12 +853,17 @@ export function FleetOverviewPage() {
   const { overview, drivers, performance } = resource.data;
   const fleetMetrics: Array<[string, string | number, LucideIcon]> = [
     ["Drivers", overview.totalDrivers, UsersRound],
-    ["Available", overview.availableDrivers, ShieldCheck],
+    ["Active trucks", overview.availableDrivers, ShieldCheck],
     ["Active jobs", overview.activeJobs, Navigation],
     [
-      "Current load",
+      "Onboard load",
       `${Math.round(overview.currentLoadKg)} / ${Math.round(overview.totalCapacityKg)} kg`,
       Truck,
+    ],
+    [
+      "Reserved capacity",
+      `${Math.round(overview.reservedLoadKg)} kg`,
+      Gauge,
     ],
   ];
   return (
@@ -827,7 +873,7 @@ export function FleetOverviewPage() {
         title="Fleet overview"
         description="Live vehicle capacity, availability, utilization, and driver performance."
       />
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-5">
         {fleetMetrics.map(([label, value, Icon]) => (
           <Panel key={label}>
             <div className="p-3.5 sm:p-5">
@@ -845,7 +891,9 @@ export function FleetOverviewPage() {
         <div className="grid gap-2.5 p-3 md:grid-cols-2 xl:grid-cols-3 sm:p-5">
           {drivers.map((driver) => {
             const percent = Math.round(
-              (driver.currentLoadKg / driver.capacityKg) * 100,
+              ((driver.currentLoadKg + driver.reservedLoadKg) /
+                driver.capacityKg) *
+                100,
             );
             return (
               <div
@@ -870,7 +918,7 @@ export function FleetOverviewPage() {
                   />
                 </div>
                 <p className="mt-2 text-[9px] text-slate-400">
-                  {driver.currentLoadKg} of {driver.capacityKg} kg assigned
+                  {driver.currentLoadKg} kg onboard · {driver.reservedLoadKg} kg reserved · {driver.capacityKg} kg capacity
                 </p>
               </div>
             );
@@ -924,7 +972,7 @@ export function FleetOverviewPage() {
                   "Avg response",
                   "Avg collection",
                   "Distance",
-                  "Vehicle use",
+                  "Current load",
                   "Completion",
                 ].map((heading) => (
                   <th key={heading} className="px-5 py-3">
@@ -1034,30 +1082,69 @@ function DriverJobsPage() {
     () => driverService.getAssignedJobs("driver"),
     "driver-jobs",
   );
+  const vehicle = useAsyncResource(
+    () => driverService.getCurrentDriver(),
+    "driver-current-vehicle",
+  );
+  usePickupRealtime(resource.reload);
   const [updating, setUpdating] = useState("");
-  const [completing, setCompleting] = useState<PickupJob | null>(null);
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [preview, setPreview] = useState("");
+  const [collecting, setCollecting] = useState<PickupJob | null>(null);
+  const [collectionPhoto, setCollectionPhoto] = useState<File | null>(null);
+  const [collectionPreview, setCollectionPreview] = useState("");
+  const [unloading, setUnloading] = useState(false);
+  const [unloadPhoto, setUnloadPhoto] = useState<File | null>(null);
+  const [unloadPreview, setUnloadPreview] = useState("");
   const [toast, setToast] = useState("");
   const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<CompletionInputValues, unknown, CompletionValues>({
-    resolver: zodResolver(completionSchema),
+    register: registerCollection,
+    handleSubmit: handleCollectionSubmit,
+    reset: resetCollection,
+    formState: {
+      errors: collectionErrors,
+      isSubmitting: isCollecting,
+    },
+  } = useForm<CollectionInputValues, unknown, CollectionValues>({
+    resolver: zodResolver(collectionSchema),
+    defaultValues: { notes: "" },
+  });
+  const {
+    register: registerUnload,
+    handleSubmit: handleUnloadSubmit,
+    reset: resetUnload,
+    formState: { errors: unloadErrors, isSubmitting: isUnloading },
+  } = useForm<UnloadInputValues, unknown, UnloadValues>({
+    resolver: zodResolver(unloadSchema),
     defaultValues: { facility: "", notes: "" },
   });
   useEffect(
     () => () => {
-      if (preview) URL.revokeObjectURL(preview);
+      if (collectionPreview) URL.revokeObjectURL(collectionPreview);
+      if (unloadPreview) URL.revokeObjectURL(unloadPreview);
     },
-    [preview],
+    [collectionPreview, unloadPreview],
   );
   const jobs = resource.data ?? [];
+  const currentVehicle = vehicle.data;
+  const currentLoad = currentVehicle?.currentLoadKg ?? 0;
+  const reservedLoad = currentVehicle?.reservedLoadKg ?? 0;
+  const capacity = currentVehicle?.capacityKg ?? 0;
+  const remainingCapacity = Math.max(0, capacity - currentLoad - reservedLoad);
+  const committedPercent = capacity
+    ? Math.min(100, ((currentLoad + reservedLoad) / capacity) * 100)
+    : 0;
+  const actualPercent = capacity
+    ? Math.min(100, (currentLoad / capacity) * 100)
+    : 0;
+  const nearlyFull =
+    capacity > 0 &&
+    remainingCapacity < Math.max(capacity * 0.1, 10);
   const advance = async (job: PickupJob) => {
+    if (job.status === "Arrived") {
+      setCollecting(job);
+      return;
+    }
     if (job.status === "Collected") {
-      setCompleting(job);
+      setUnloading(true);
       return;
     }
     setUpdating(job.id);
@@ -1067,14 +1154,15 @@ function DriverJobsPage() {
           ? await driverService.acceptAssignment(job.id)
           : job.status === "Accepted"
             ? await driverService.startJourney(job.id)
-            : job.status === "In transit"
-              ? await driverService.markArrived(job.id)
-              : await driverService.collectWaste(job.id);
+            : await driverService.markArrived(job.id);
       resource.setData(
         jobs.map((item) =>
           item.id === job.id ? { ...job, ...updated } : item,
         ),
       );
+      if (updated.status === "In transit") {
+        window.dispatchEvent(new Event("ecoloop:start-live-tracking"));
+      }
       setToast(`${job.id} updated to ${updated.status}.`);
     } catch (reason) {
       setToast(
@@ -1086,27 +1174,61 @@ function DriverJobsPage() {
       setUpdating("");
     }
   };
-  const complete = async (values: CompletionValues) => {
-    if (!completing) return;
+  const recordCollection = async (values: CollectionValues) => {
+    if (!collecting) return;
     try {
-      const completionImageUrl = photo
-        ? await pickupService.uploadPickupImage(photo, "completion")
+      const collectionImageUrl = collectionPhoto
+        ? await pickupService.uploadPickupImage(collectionPhoto, "completion")
         : undefined;
-      await driverService.completePickup(completing.id, {
+      const updated = await driverService.collectWaste(collecting.id, {
         ...values,
-        completionImageUrl,
+        collectionImageUrl,
       });
-      resource.setData(jobs.filter((item) => item.id !== completing.id));
-      setCompleting(null);
-      setPhoto(null);
-      setPreview("");
-      reset();
-      setToast("Pickup completed with measured weight.");
+      resource.setData(
+        jobs.map((item) =>
+          item.id === collecting.id ? { ...item, ...updated } : item,
+        ),
+      );
+      vehicle.reload();
+      setCollecting(null);
+      setCollectionPhoto(null);
+      setCollectionPreview("");
+      resetCollection();
+      setToast(
+        `${values.actualWeight} kg added to the vehicle. It remains onboard until facility unload.`,
+      );
     } catch (reason) {
       setToast(
         reason instanceof Error
           ? reason.message
-          : "Pickup completion could not be recorded.",
+          : "Collected waste could not be recorded.",
+      );
+    }
+  };
+  const unloadVehicle = async (values: UnloadValues) => {
+    try {
+      const imageUrl = unloadPhoto
+        ? await pickupService.uploadPickupImage(unloadPhoto, "completion")
+        : undefined;
+      const result = await driverService.unloadVehicle({ ...values, imageUrl });
+      const remainingJobs = jobs.filter((item) => item.status !== "Collected");
+      resource.setData(remainingJobs);
+      vehicle.reload();
+      if (!remainingJobs.length) {
+        window.dispatchEvent(new Event("ecoloop:stop-live-tracking"));
+      }
+      setUnloading(false);
+      setUnloadPhoto(null);
+      setUnloadPreview("");
+      resetUnload();
+      setToast(
+        `${result.totalWeightKg} kg delivered to ${result.facility}. Vehicle load updated.`,
+      );
+    } catch (reason) {
+      setToast(
+        reason instanceof Error
+          ? reason.message
+          : "The vehicle unload could not be recorded.",
       );
     }
   };
@@ -1115,8 +1237,67 @@ function DriverJobsPage() {
       <PageHeader
         eyebrow="Today's route"
         title="Assigned pickups"
-        description="Complete each status in order so vendors and managers receive live updates."
+        description="Collected waste remains onboard until you record delivery at the destination facility."
       />
+      <Panel
+        title="Vehicle load"
+        subtitle={
+          currentVehicle
+            ? `${currentVehicle.vehicleNumber} · ${currentVehicle.vehicleType}`
+            : "Loading vehicle capacity"
+        }
+        action={
+          <Button
+            size="sm"
+            disabled={!currentVehicle || currentLoad <= 0}
+            onClick={() => setUnloading(true)}
+          >
+            <Warehouse className="size-4" /> Unload at facility
+          </Button>
+        }
+      >
+        {vehicle.loading ? (
+          <div className="h-28 animate-pulse bg-slate-50 dark:bg-slate-950" />
+        ) : vehicle.error ? (
+          <p className="p-5 text-center text-xs text-rose-600">{vehicle.error}</p>
+        ) : (
+          <div className="p-4 sm:p-5">
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ["Onboard", `${Math.round(currentLoad)} kg`],
+                ["Reserved", `${Math.round(reservedLoad)} kg`],
+                ["Remaining", `${Math.round(remainingCapacity)} kg`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
+                  <p className="text-base font-semibold sm:text-xl">{value}</p>
+                  <p className="mt-1 text-[9px] text-slate-400 sm:text-[10px]">{label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{ width: `${actualPercent}%` }}
+                title="Measured waste onboard"
+              />
+              <div
+                className="h-full bg-blue-400 transition-all"
+                style={{ width: `${Math.max(0, committedPercent - actualPercent)}%` }}
+                title="Capacity reserved for assigned pickups"
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[9px] text-slate-400">
+              <span>Green: onboard · Blue: reserved</span>
+              <span>{Math.round(committedPercent)}% committed</span>
+            </div>
+            {nearlyFull && (
+              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-[10px] font-medium text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                Vehicle capacity is nearly full. New assignments are paused until the collected load is delivered.
+              </p>
+            )}
+          </div>
+        )}
+      </Panel>
       {resource.loading ? (
         <div className="h-64 animate-pulse rounded-xl bg-white dark:bg-slate-900" />
       ) : resource.error ? (
@@ -1212,7 +1393,7 @@ function DriverJobsPage() {
           />
         </Panel>
       )}
-      {completing && (
+      {collecting && (
         <div
           className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm"
           role="dialog"
@@ -1220,61 +1401,55 @@ function DriverJobsPage() {
           aria-labelledby="complete-pickup-title"
         >
           <form
-            onSubmit={handleSubmit(complete)}
+            onSubmit={handleCollectionSubmit(recordCollection)}
             className="my-auto w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-900 sm:p-6"
           >
             <div className="flex justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
-                  {completing.id}
+                  {collecting.id}
                 </p>
                 <h2
                   id="complete-pickup-title"
                   className="mt-1 text-xl font-semibold"
                 >
-                  Complete pickup
+                  Record collected waste
                 </h2>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => setCompleting(null)}
-                aria-label="Close completion form"
+                onClick={() => setCollecting(null)}
+                aria-label="Close collection form"
               >
                 <X className="size-4" />
               </Button>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 grid gap-3">
               <Field
                 label="Actual weight (kg)"
-                error={errors.actualWeight?.message}
+                error={collectionErrors.actualWeight?.message}
               >
                 <input
-                  {...register("actualWeight")}
+                  {...registerCollection("actualWeight")}
                   type="number"
                   min="0.1"
                   step="0.1"
                   className={inputClass}
                 />
               </Field>
-              <Field
-                label="Destination facility"
-                error={errors.facility?.message}
-              >
-                <input {...register("facility")} className={inputClass} />
-              </Field>
             </div>
             <label className={`${labelClass} mt-4 block`}>
               Collection notes
               <textarea
-                {...register("notes")}
+                {...registerCollection("notes")}
                 rows={3}
                 className={`${inputClass} h-auto py-3`}
               />
             </label>
             <label className="mt-4 block cursor-pointer rounded-xl border border-dashed border-slate-300 p-3 text-center text-xs font-semibold text-slate-500 dark:border-slate-700">
-              Upload completion photo (optional)
+              Upload collection photo (optional)
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -1282,16 +1457,16 @@ function DriverJobsPage() {
                 className="sr-only"
                 onChange={(event) => {
                   const file = event.target.files?.[0] ?? null;
-                  if (preview) URL.revokeObjectURL(preview);
-                  setPhoto(file);
-                  setPreview(file ? URL.createObjectURL(file) : "");
+                  if (collectionPreview) URL.revokeObjectURL(collectionPreview);
+                  setCollectionPhoto(file);
+                  setCollectionPreview(file ? URL.createObjectURL(file) : "");
                 }}
               />
             </label>
-            {preview && (
+            {collectionPreview && (
               <Image
-                src={preview}
-                alt="Completion preview"
+                src={collectionPreview}
+                alt="Collection preview"
                 width={640}
                 height={360}
                 unoptimized
@@ -1300,11 +1475,96 @@ function DriverJobsPage() {
             )}
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isCollecting}
               className="mt-5 w-full"
             >
               <ClipboardCheck className="size-4" />
-              {isSubmitting ? "Completing…" : "Complete pickup"}
+              {isCollecting ? "Recording…" : "Add load to vehicle"}
+            </Button>
+          </form>
+        </div>
+      )}
+      {unloading && (
+        <div
+          className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="unload-vehicle-title"
+        >
+          <form
+            onSubmit={handleUnloadSubmit(unloadVehicle)}
+            className="my-auto w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-900 sm:p-6"
+          >
+            <div className="flex justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                  Facility delivery
+                </p>
+                <h2 id="unload-vehicle-title" className="mt-1 text-xl font-semibold">
+                  Unload vehicle
+                </h2>
+                <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                  {Math.round(currentLoad)} kg measured waste currently onboard
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setUnloading(false)}
+                aria-label="Close unload form"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="mt-5">
+              <Field
+                label="Destination facility"
+                error={unloadErrors.facility?.message}
+              >
+                <input {...registerUnload("facility")} className={inputClass} />
+              </Field>
+            </div>
+            <label className={`${labelClass} mt-4 block`}>
+              Delivery notes
+              <textarea
+                {...registerUnload("notes")}
+                rows={3}
+                className={`${inputClass} h-auto py-3`}
+              />
+            </label>
+            <label className="mt-4 block cursor-pointer rounded-xl border border-dashed border-slate-300 p-3 text-center text-xs font-semibold text-slate-500 dark:border-slate-700">
+              Upload unload proof (optional)
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  if (unloadPreview) URL.revokeObjectURL(unloadPreview);
+                  setUnloadPhoto(file);
+                  setUnloadPreview(file ? URL.createObjectURL(file) : "");
+                }}
+              />
+            </label>
+            {unloadPreview && (
+              <Image
+                src={unloadPreview}
+                alt="Unload proof preview"
+                width={640}
+                height={360}
+                unoptimized
+                className="mt-3 aspect-video w-full rounded-xl object-cover"
+              />
+            )}
+            <Button
+              type="submit"
+              disabled={isUnloading || currentLoad <= 0}
+              className="mt-5 w-full"
+            >
+              <Warehouse className="size-4" />
+              {isUnloading ? "Recording delivery…" : "Confirm facility unload"}
             </Button>
           </form>
         </div>
@@ -1318,8 +1578,8 @@ function actionLabel(status: PickupJob["status"]) {
   if (status === "Assigned") return "Accept assignment";
   if (status === "Accepted") return "Start journey";
   if (status === "In transit") return "Mark arrived";
-  if (status === "Arrived") return "Confirm waste collected";
-  if (status === "Collected") return "Record weight and complete";
+  if (status === "Arrived") return "Record collected weight";
+  if (status === "Collected") return "Unload at facility";
   return "Update pickup";
 }
 
@@ -1328,12 +1588,7 @@ function DriverRoutePage() {
     () => driverService.getAssignedJobs("driver"),
     "driver-route",
   );
-  const driverResource = useAsyncResource(
-    () => driverService.getDrivers(),
-    "driver-route-location",
-  );
-  const [locating, setLocating] = useState(false);
-  const [toast, setToast] = useState("");
+  usePickupRealtime(resource.reload);
   const jobs = useMemo(
     () =>
       [...(resource.data ?? [])].sort(
@@ -1341,111 +1596,20 @@ function DriverRoutePage() {
       ),
     [resource.data],
   );
-  const currentDriver = driverResource.data?.[0];
   const nextJob = jobs[0];
-  const updateLocation = () => {
-    if (!navigator.geolocation) {
-      setToast("Location is not supported on this device.");
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const updatedDriver = await driverService.updateLocation(
-            position.coords.latitude,
-            position.coords.longitude,
-          );
-          driverResource.setData([updatedDriver]);
-          setToast("Current driver location updated.");
-        } catch (reason) {
-          setToast(
-            reason instanceof Error
-              ? reason.message
-              : "Location could not be updated.",
-          );
-        } finally {
-          setLocating(false);
-        }
-      },
-      () => {
-        setLocating(false);
-        setToast("Location permission was not granted.");
-      },
-      { enableHighAccuracy: true, timeout: 12_000 },
-    );
-  };
   return (
     <div className="space-y-4 sm:space-y-7">
       <PageHeader
         eyebrow="Route overview"
         title="Current route"
-        description="A simple stop overview prepared for future Google Maps navigation."
-        action={
-          <Button onClick={updateLocation} disabled={locating}>
-            <LocateFixed className="size-4" />
-            {locating ? "Locating…" : "Update location"}
-          </Button>
-        }
+        description="Live driver position and the current collection order."
       />
-      <Panel>
-        <div
-          data-map-provider="future-google-maps"
-          className="relative min-h-64 overflow-hidden bg-[radial-gradient(circle_at_20%_25%,rgba(34,197,94,.16),transparent_28%),radial-gradient(circle_at_78%_68%,rgba(59,130,246,.14),transparent_25%),linear-gradient(135deg,#f8fafc,#eef7f1)] dark:bg-[linear-gradient(135deg,#0f172a,#052e25)]"
-        >
-          <div
-            className="absolute inset-0 opacity-30"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(100,116,139,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(100,116,139,.18) 1px,transparent 1px)",
-              backgroundSize: "32px 32px",
-            }}
-          />
-          <span className="absolute left-[18%] top-[28%] grid size-11 place-items-center rounded-full bg-slate-950 text-white shadow-xl">
-            <Truck className="size-5" />
-          </span>
-          {jobs.slice(0, 4).map((job, index) => (
-            <span
-              key={job.id}
-              className="absolute grid size-9 place-items-center rounded-full bg-emerald-600 text-xs font-bold text-white shadow-lg"
-              style={{
-                left: `${35 + index * 14}%`,
-                top: `${35 + (index % 2) * 20}%`,
-              }}
-            >
-              {job.routeStopOrder ?? index + 1}
-            </span>
-          ))}
-          <div className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/80 bg-white/90 p-3 text-[10px] text-slate-600 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-300">
-            <p className="font-semibold">Route preview</p>
-            <div className="mt-1 grid gap-1 sm:grid-cols-3">
-              <p>
-                Driver:{" "}
-                {currentDriver?.latitude !== undefined &&
-                currentDriver.longitude !== undefined
-                  ? `${currentDriver.latitude.toFixed(4)}, ${currentDriver.longitude.toFixed(4)}`
-                  : "update GPS location"}
-              </p>
-              <p>
-                Next vendor:{" "}
-                {nextJob?.vendorLatitude !== undefined &&
-                nextJob.vendorLongitude !== undefined
-                  ? `${nextJob.vendorLatitude.toFixed(4)}, ${nextJob.vendorLongitude.toFixed(4)}`
-                  : (nextJob?.location ?? "no stop assigned")}
-              </p>
-              <p>
-                {nextJob?.distanceKm === undefined
-                  ? "Distance calculating"
-                  : `${nextJob.distanceKm.toFixed(1)} km`}{" "}
-                ·{" "}
-                {nextJob?.estimatedTravelMinutes === undefined
-                  ? "travel time calculating"
-                  : `${nextJob.estimatedTravelMinutes} min`}
-              </p>
-            </div>
-          </div>
-        </div>
-      </Panel>
+      <LivePickupTracking
+        driverId={nextJob?.assignedDriverId}
+        status={nextJob?.status}
+        destinationLatitude={nextJob?.vendorLatitude}
+        destinationLongitude={nextJob?.vendorLongitude}
+      />
       <Panel
         title="Collection order"
         subtitle="Priority and market batching determine the initial order"
@@ -1483,7 +1647,6 @@ function DriverRoutePage() {
           />
         )}
       </Panel>
-      {toast && <Toast message={toast} onClose={() => setToast("")} />}
     </div>
   );
 }

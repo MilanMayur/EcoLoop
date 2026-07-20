@@ -34,6 +34,7 @@ import { useAsyncResource } from "@/hooks/use-async-resource";
 import { DashboardAIInsights } from "@/components/ai/dashboard-insights";
 import { useDashboardProfile } from "@/components/dashboard/profile-context";
 import { RecyclerFleetOverview } from "@/components/dashboard/driver-workflow";
+import { usePickupRealtime } from "@/hooks/use-pickup-realtime";
 
 const copy = {
   vendor: {
@@ -84,6 +85,7 @@ export function RoleOverview({ role }: { role: DashboardRole }) {
     () => analyticsService.getDashboard(role),
     role,
   );
+  usePickupRealtime(resource.reload);
   const displayName =
     role === "recycler"
       ? profile?.organization || profile?.name || "Recycling partner"

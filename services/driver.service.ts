@@ -3,10 +3,17 @@ import type {
   DriverInput,
   DriverPerformance,
   FleetOverview,
+  PickupCollectionInput,
   PickupCompletionInput,
   PickupJob,
+  VehicleUnload,
+  VehicleUnloadInput,
 } from "@/types/mvp";
 import { ServiceError } from "@/services/service-error";
+import {
+  isWithinOperatingHours,
+  OPERATING_HOURS_LABEL,
+} from "@/lib/operating-hours";
 import {
   optionalSupabase,
   relativeTime,
@@ -25,6 +32,7 @@ type DriverRow = {
   vehicle_type: string;
   capacity_kg: number | string;
   current_load: number | string;
+  reserved_load: number | string;
   status: Driver["status"];
   current_latitude: number | null;
   current_longitude: number | null;
@@ -50,6 +58,7 @@ type DriverJobRow = {
   status: string;
   created_at: string;
   assigned_vehicle: string | null;
+  assigned_driver_id: string | null;
   estimated_arrival: string | null;
   route_stop_order: number | null;
   assignment_time: string | null;
@@ -65,11 +74,11 @@ type DriverJobRow = {
 };
 
 const driverSelect =
-  "id, partner_id, user_id, name, email, phone, vehicle_number, vehicle_type, capacity_kg, current_load, status, current_latitude, current_longitude, is_available, compatible_waste_types, last_location_at, created_at";
+  "id, partner_id, user_id, name, email, phone, vehicle_number, vehicle_type, capacity_kg, current_load, reserved_load, status, current_latitude, current_longitude, is_available, compatible_waste_types, last_location_at, created_at";
 const jobSelect =
-  "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, created_at, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude, vendor_phone, assigned_driver:drivers!pickup_requests_assigned_driver_id_fkey(name), pickup_assignments(distance_km, released_at, assigned_at)";
+  "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, created_at, assigned_vehicle, assigned_driver_id, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude, vendor_phone, assigned_driver:drivers!pickup_requests_assigned_driver_id_fkey(name), pickup_assignments(distance_km, released_at, assigned_at)";
 const jobSelectWithoutAssignmentHistory =
-  "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, created_at, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude, vendor_phone, assigned_driver:drivers!pickup_requests_assigned_driver_id_fkey(name)";
+  "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, created_at, assigned_vehicle, assigned_driver_id, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude, vendor_phone, assigned_driver:drivers!pickup_requests_assigned_driver_id_fkey(name)";
 
 const client = () => {
   const supabase = optionalSupabase();
@@ -92,6 +101,7 @@ const fromRow = (row: DriverRow): Driver => ({
   vehicleType: row.vehicle_type,
   capacityKg: Number(row.capacity_kg),
   currentLoadKg: Number(row.current_load),
+  reservedLoadKg: Number(row.reserved_load),
   status: row.status,
   latitude: row.current_latitude ?? undefined,
   longitude: row.current_longitude ?? undefined,
@@ -157,6 +167,7 @@ const jobFromRow = (row: DriverJobRow): PickupJob => {
     assignedDriver: Array.isArray(row.assigned_driver)
       ? row.assigned_driver[0]?.name
       : row.assigned_driver?.name,
+    assignedDriverId: row.assigned_driver_id ?? undefined,
   };
 };
 
@@ -182,6 +193,13 @@ export const driverService = {
       .order("created_at");
     throwDatabaseError(error, "Drivers could not be loaded.");
     return (data as DriverRow[]).map(fromRow);
+  },
+
+  async getCurrentDriver() {
+    const drivers = await this.getDrivers();
+    const driver = drivers[0];
+    if (!driver) throw new ServiceError("Driver profile could not be loaded.", 404);
+    return driver;
   },
 
   async inviteDriver(payload: DriverInput) {
@@ -252,6 +270,7 @@ export const driverService = {
 
   async getFleetOverview(): Promise<FleetOverview> {
     const supabase = client();
+    const operatingNow = isWithinOperatingHours();
     // pg_cron handles this in production. Running the same idempotent function
     // when a recycling partner opens the fleet also covers projects where a
     // scheduled run is delayed, without assigning a pickup before its batch
@@ -276,11 +295,19 @@ export const driverService = {
       .maybeSingle();
     return {
       totalDrivers: drivers.length,
-      availableDrivers: drivers.filter((item) => item.isAvailable).length,
+      availableDrivers: operatingNow
+        ? drivers.filter((item) => item.isAvailable).length
+        : 0,
       activeJobs: activeJobs.length,
       totalCapacityKg: drivers.reduce((sum, item) => sum + item.capacityKg, 0),
       currentLoadKg: drivers.reduce((sum, item) => sum + item.currentLoadKg, 0),
+      reservedLoadKg: drivers.reduce(
+        (sum, item) => sum + item.reservedLoadKg,
+        0,
+      ),
       batchingWindowSeconds: Number(config?.batching_window_seconds ?? 30),
+      operatingNow,
+      operatingHoursLabel: OPERATING_HOURS_LABEL,
     };
   },
 
@@ -383,6 +410,12 @@ export const driverService = {
   },
 
   async processReadyBatches() {
+    if (!isWithinOperatingHours()) {
+      throw new ServiceError(
+        `Assignments are paused outside operating hours (${OPERATING_HOURS_LABEL}). Pending requests will remain queued.`,
+        409,
+      );
+    }
     const supabase = client();
     await requireUser(supabase);
     const { data, error } = await supabase.rpc("process_pickup_batches");
@@ -425,8 +458,43 @@ export const driverService = {
   markArrived(referenceCode: string) {
     return this.updatePickupStatus(referenceCode, "arrived");
   },
-  collectWaste(referenceCode: string) {
-    return this.updatePickupStatus(referenceCode, "collected");
+  async collectWaste(referenceCode: string, payload: PickupCollectionInput) {
+    const supabase = client();
+    await requireUser(supabase);
+    const id = await pickupId(referenceCode);
+    const { data, error } = await supabase.rpc("driver_collect_pickup", {
+      p_pickup_id: id,
+      p_actual_weight: payload.actualWeight,
+      p_collection_notes: payload.notes || null,
+      p_collection_image_url: payload.collectionImageUrl || null,
+    });
+    throwDatabaseError(error, "Collected waste could not be recorded.");
+    return jobFromRow(data as DriverJobRow);
+  },
+
+  async unloadVehicle(payload: VehicleUnloadInput): Promise<VehicleUnload> {
+    const supabase = client();
+    await requireUser(supabase);
+    const { data, error } = await supabase.rpc("driver_unload_vehicle", {
+      p_facility: payload.facility,
+      p_notes: payload.notes || null,
+      p_image_url: payload.imageUrl || null,
+    });
+    throwDatabaseError(error, "The vehicle unload could not be recorded.");
+    const row = data as {
+      id: string;
+      driver_id: string;
+      facility: string;
+      total_weight: number | string;
+      created_at: string;
+    };
+    return {
+      id: row.id,
+      driverId: row.driver_id,
+      facility: row.facility,
+      totalWeightKg: Number(row.total_weight),
+      createdAt: row.created_at,
+    };
   },
 
   async completePickup(referenceCode: string, payload: PickupCompletionInput) {

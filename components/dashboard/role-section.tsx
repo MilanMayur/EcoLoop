@@ -33,6 +33,10 @@ import {
   FleetOverviewPage,
   PartnerAssignedJobsPage,
 } from "@/components/dashboard/driver-workflow";
+import { LivePickupTracking } from "@/components/dashboard/live-tracking";
+import { usePickupRealtime } from "@/hooks/use-pickup-realtime";
+import { isWithinOperatingHours } from "@/lib/operating-hours";
+import { SupportRequestsPage } from "@/components/dashboard/support-requests-page";
 
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
 const labelClass = "text-xs font-semibold text-slate-700 dark:text-slate-300";
@@ -195,7 +199,11 @@ function PickupForm() {
       setPhoto(null);
       setPhotoKey((value) => value + 1);
       window.setTimeout(() => router.push("/dashboard/vendor"), 1800);
-      setToast(`Pickup ${result.id} created. We’re matching a verified recycler.`);
+      setToast(
+        isWithinOperatingHours()
+          ? `Pickup ${result.id} created. We’re matching a verified recycler.`
+          : `Pickup ${result.id} created. It is queued for assignment after 6:00 AM IST.`,
+      );
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "We couldn’t create this pickup request.");
     }
@@ -205,6 +213,7 @@ function PickupForm() {
 
 function RequestsPage({ history, admin = false }: { history: boolean; admin?: boolean }) {
   const resource = useAsyncResource(() => pickupService.getRequests(), `requests-${history}-${admin}`);
+  usePickupRealtime(resource.reload);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All statuses");
   const [sort, setSort] = useState("Newest");
@@ -218,9 +227,24 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
   const headers = admin
     ? ["Request ID", "Waste type", "Fill level", "Actual weight", "Pickup photo", "Completion photo", "Status", "Status timeline"]
     : ["Request ID", "Waste type", "Fill level", "Actual weight", "Assigned recycler", "Status", "Created time", "ETA"];
+  const activeTrackingRequest = filtered.find(
+    (item) =>
+      item.assignedDriverId &&
+      ["Assigned", "Accepted", "In transit", "Arrived", "Collected"].includes(
+        item.status,
+      ),
+  );
   return (
     <div className="space-y-4 sm:space-y-7">
       <PageHeader eyebrow={admin ? "BBMP operations" : "Vendor operations"} title={history ? "Pickup history" : admin ? "Pickup requests" : "My requests"} description={history ? "A complete, auditable record of recovered waste." : admin ? "Live status and SLA visibility across all connected markets." : "Track live pickup status, assigned partners, and arrival estimates."} action={!history && !admin && <Button asChild><Link href="/dashboard/vendor/request-pickup"><Plus className="size-4" /> New request</Link></Button>} />
+      {activeTrackingRequest && (
+        <LivePickupTracking
+          driverId={activeTrackingRequest.assignedDriverId}
+          status={activeTrackingRequest.status}
+          destinationLatitude={activeTrackingRequest.vendorLatitude}
+          destinationLongitude={activeTrackingRequest.vendorLongitude}
+        />
+      )}
       <Panel>
         <div className="grid grid-cols-2 gap-2 border-b border-slate-100 p-3 dark:border-slate-800 sm:flex sm:gap-3 sm:p-4">
           <input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search request ID…" className={`${inputClass} col-span-2 mt-0 h-10 text-sm sm:max-w-xs`} />
@@ -325,6 +349,7 @@ function AdminSection({ section }: { section: string }) {
   if (section === "partners") return <PartnersPage />;
   if (section === "analytics") return <AnalyticsPage role="admin" />;
   if (section === "reports") return <ReportsPage />;
+  if (section === "support") return <SupportRequestsPage />;
   if (section === "settings") return <AdminSettingsPage />;
   return <UnknownSection />;
 }

@@ -30,12 +30,15 @@ export type PickupRequest = {
   time: string;
   eta: string;
   assignedDriver?: string;
+  assignedDriverId?: string;
   assignedVehicle?: string;
   assignmentTime?: string;
   estimatedArrival?: string;
   estimatedTravelMinutes?: number;
   routeStopOrder?: number;
   distanceKm?: number;
+  vendorLatitude?: number;
+  vendorLongitude?: number;
 };
 
 export type PickupJob = {
@@ -63,6 +66,7 @@ export type PickupJob = {
     | "Collected"
     | "Completed";
   assignedDriver?: string;
+  assignedDriverId?: string;
   assignedVehicle?: string;
   assignmentTime?: string;
   estimatedArrival?: string;
@@ -87,6 +91,26 @@ export type PickupCompletionInput = {
   facility: string;
   notes?: string;
   completionImageUrl?: string;
+};
+
+export type PickupCollectionInput = {
+  actualWeight: number;
+  notes?: string;
+  collectionImageUrl?: string;
+};
+
+export type VehicleUnloadInput = {
+  facility: string;
+  notes?: string;
+  imageUrl?: string;
+};
+
+export type VehicleUnload = {
+  id: string;
+  driverId: string;
+  facility: string;
+  totalWeightKg: number;
+  createdAt: string;
 };
 
 export type InventoryInput = Omit<StockProduct, "id" | "forecast" | "risk">;
@@ -182,6 +206,7 @@ export type Driver = {
   vehicleType: string;
   capacityKg: number;
   currentLoadKg: number;
+  reservedLoadKg: number;
   status: DriverStatus;
   latitude?: number;
   longitude?: number;
@@ -189,6 +214,16 @@ export type Driver = {
   compatibleWasteTypes: string[];
   lastLocationAt?: string;
   createdAt: string;
+};
+
+export type DriverLocation = {
+  driverId: string;
+  latitude: number;
+  longitude: number;
+  accuracyM?: number;
+  speedMps?: number;
+  headingDegrees?: number;
+  recordedAt: string;
 };
 
 export type DriverInput = {
@@ -220,5 +255,8 @@ export type FleetOverview = {
   activeJobs: number;
   totalCapacityKg: number;
   currentLoadKg: number;
+  reservedLoadKg: number;
   batchingWindowSeconds: number;
+  operatingNow: boolean;
+  operatingHoursLabel: string;
 };

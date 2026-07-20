@@ -16,6 +16,8 @@ import { useLanguage } from "@/components/i18n/language-provider";
 import { MobileBottomNavigation } from "@/components/dashboard/mobile-navigation";
 import { AICopilot } from "@/components/ai/copilot";
 import { DashboardProfileProvider } from "@/components/dashboard/profile-context";
+import { DriverTrackingControl } from "@/components/dashboard/driver-tracking-control";
+import { HelpCentreModal } from "@/components/dashboard/help-centre-modal";
 
 export function DashboardShell({ role, children }: { role: DashboardRole; children: ReactNode }) {
   const pathname = usePathname();
@@ -24,6 +26,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [dark, setDark] = useState(false);
   const [account, setAccount] = useState<CurrentProfile | null>(null);
@@ -159,7 +162,16 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
       <div className="m-4 mt-0 shrink-0 rounded-2xl bg-slate-950 p-4 text-white dark:bg-emerald-950">
         <span className="grid size-8 place-items-center rounded-lg bg-white/10"><HelpCircle className="size-4 text-emerald-400" /></span>
         <p className="mt-4 text-xs font-semibold">Need a hand?</p><p className="mt-1 text-[10px] leading-4 text-slate-400">Talk to EcoLoop support or view the help centre.</p>
-        <button disabled title="Coming Soon" className="mt-3 cursor-not-allowed text-[10px] font-semibold text-slate-500">Help centre · Coming Soon</button>
+        <button
+          type="button"
+          onClick={() => {
+            setMobileOpen(false);
+            setHelpOpen(true);
+          }}
+          className="mt-3 min-h-10 rounded-lg text-[10px] font-semibold text-emerald-400 transition hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+        >
+          {t("Open Help Centre")}
+        </button>
       </div>
     </div>
   );
@@ -187,6 +199,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
           </div>
 
           <div className="ml-auto flex items-center gap-0.5 sm:gap-1.5">
+            {role === "driver" && <DriverTrackingControl />}
             <LanguageSelector persistToProfile className="hidden max-w-[8.5rem] sm:inline-flex" />
             <Button variant="ghost" size="icon" className="hidden sm:inline-flex" onClick={toggleDark} aria-label={dark ? "Use light mode" : "Use dark mode"}>{dark ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}</Button>
 
@@ -230,6 +243,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
 
       <MobileBottomNavigation role={role} onNavigate={closeMobileLayers} />
       <AICopilot role={role} />
+      <HelpCentreModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
     </DashboardProfileProvider>
   );
