@@ -252,6 +252,16 @@ export const driverService = {
 
   async getFleetOverview(): Promise<FleetOverview> {
     const supabase = client();
+    // pg_cron handles this in production. Running the same idempotent function
+    // when a recycling partner opens the fleet also covers projects where a
+    // scheduled run is delayed, without assigning a pickup before its batch
+    // window has elapsed.
+    try {
+      await this.processReadyBatches();
+    } catch {
+      // Fleet visibility must remain available when assignment processing is
+      // temporarily unavailable; the scheduled job will retry separately.
+    }
     const [drivers, activeJobs] = await Promise.all([
       this.getDrivers(),
       // Reuse the role-scoped job query used by the assigned-jobs panel. This

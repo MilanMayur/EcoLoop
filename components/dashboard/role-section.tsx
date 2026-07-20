@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -165,6 +166,7 @@ function PickupPhoto({ url, alt }: { url?: string; alt: string }) {
 }
 
 function PickupForm() {
+  const router = useRouter();
   const [wasteType, setWasteType] = useState("Wet");
   const [fillLevel, setFillLevel] = useState<FillLevel>("50%");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -192,6 +194,7 @@ function PickupForm() {
       setFillLevel("50%");
       setPhoto(null);
       setPhotoKey((value) => value + 1);
+      window.setTimeout(() => router.push("/dashboard/vendor"), 1800);
       setToast(`Pickup ${result.id} created. We’re matching a verified recycler.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "We couldn’t create this pickup request.");
