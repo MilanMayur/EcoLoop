@@ -25,7 +25,6 @@ import { pickupService } from "@/services/pickup.service";
 import { useAsyncResource } from "@/hooks/use-async-resource";
 import { includesSearch, paginate } from "@/utils/table";
 import { aiService } from "@/services/ai.service";
-import type { WasteImageAnalysis } from "@/types/ai";
 import {
   AssignmentQueuePage,
   DriverManagementPage,
@@ -103,12 +102,10 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 function PhotoUploadField({ label, helper, onChange }: { label: string; helper: string; onChange: (file: File | null) => void }) {
   const [preview, setPreview] = useState("");
   const [fileError, setFileError] = useState("");
-  const [analysis, setAnalysis] = useState<WasteImageAnalysis | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
-  const chooseFile = async (file?: File) => {
+  const chooseFile = (file?: File) => {
     setFileError("");
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -121,17 +118,6 @@ function PhotoUploadField({ label, helper, onChange }: { label: string; helper: 
     }
     setPreview(URL.createObjectURL(file));
     onChange(file);
-    if (label.toLowerCase().includes("pickup photo")) {
-      setAnalyzing(true);
-      setAnalysis(null);
-      try {
-        const result = await aiService.analyzeWasteImage(file);
-        setAnalysis(result);
-        window.dispatchEvent(new CustomEvent<WasteImageAnalysis>("ecoloop:waste-analysis", { detail: result }));
-      } catch (error) {
-        setFileError(error instanceof Error ? error.message : "AI image analysis is temporarily unavailable.");
-      } finally { setAnalyzing(false); }
-    }
   };
 
   return (
@@ -149,8 +135,6 @@ function PhotoUploadField({ label, helper, onChange }: { label: string; helper: 
       </div>
       <p className="mt-2 text-[10px] leading-4 text-slate-400">{helper}</p>
       <p className="mt-1 text-[10px] text-slate-400">JPG, PNG, or WEBP · maximum 5 MB</p>
-      {analyzing && <p className="mt-2 animate-pulse text-[10px] font-medium text-emerald-600">EcoLoop AI is assessing the waste image…</p>}
-      {analysis && <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[10px] leading-4 text-emerald-800"><p className="font-semibold">AI estimate: {analysis.detectedWasteType} · {analysis.estimatedFillLevel} · {Math.round(analysis.confidence)}% confidence</p><p className="mt-1">{analysis.explanation} You can edit the selections above.</p></div>}
       {fileError && <p role="alert" className="mt-2 text-[10px] text-rose-600">{fileError}</p>}
       {preview && <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950 sm:mt-4 sm:rounded-2xl"><Image src={preview} alt={`${label} preview`} width={720} height={420} unoptimized className="max-h-40 w-full object-contain sm:max-h-64" /></div>}
     </div>
@@ -179,17 +163,6 @@ function PickupForm() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PickupInputValues, unknown, PickupValues>({ resolver: zodResolver(pickupSchema), defaultValues: { priority: "Normal", notes: "" } });
-  useEffect(() => {
-    const applyAnalysis = (event: Event) => {
-      const result = (event as CustomEvent<WasteImageAnalysis>).detail;
-      const detected = result.detectedWasteType.toLowerCase();
-      const matched = detected.includes("plastic") ? "Plastic" : detected.includes("metal") ? "Metal" : detected.includes("organic") || detected.includes("wet") || detected.includes("food") ? "Wet" : detected.includes("dry") || detected.includes("paper") ? "Dry" : "Mixed";
-      setWasteType(matched);
-      setFillLevel(result.estimatedFillLevel);
-    };
-    window.addEventListener("ecoloop:waste-analysis", applyAnalysis);
-    return () => window.removeEventListener("ecoloop:waste-analysis", applyAnalysis);
-  }, []);
   const submit = async (values: PickupValues) => {
     setError("");
     try {

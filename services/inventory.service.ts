@@ -1,8 +1,7 @@
-import { stockAlerts, stockForecasts, stockProducts } from "@/data/smart-stock";
 import type { StockProduct, StockRisk } from "@/types/dashboard";
 import type { InventoryInput } from "@/types/mvp";
 import { ServiceError } from "@/services/service-error";
-import { mockDelay, optionalSupabase, requireUser, throwDatabaseError } from "@/services/supabase.data";
+import { optionalSupabase, requireUser, throwDatabaseError } from "@/services/supabase.data";
 
 type InventoryRow = {
   id: string;
@@ -14,8 +13,6 @@ type InventoryRow = {
   forecast: number | string;
   risk: StockRisk;
 };
-
-let inventoryStore: StockProduct[] = stockProducts.map((item) => ({ ...item }));
 
 const riskFor = (stock: number, forecast: number): StockRisk => {
   const excess = stock - forecast;
@@ -43,7 +40,7 @@ const inventorySelect = "id, name, stock, unit, expiry_date, price, forecast, ri
 export const inventoryService = {
   async getInventory() {
     const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return inventoryStore.map((item) => ({ ...item })); }
+    if (!supabase) throw new ServiceError("Supabase is not configured. Inventory cannot be loaded.", 503);
     const user = await requireUser(supabase);
     const { data, error } = await supabase.from("inventory_items").select(inventorySelect)
       .eq("vendor_id", user.id).order("updated_at", { ascending: false });
@@ -53,12 +50,7 @@ export const inventoryService = {
 
   async createInventory(payload: InventoryInput) {
     const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      const product = enrich(payload, `STK-${Date.now()}`);
-      inventoryStore = [product, ...inventoryStore];
-      return product;
-    }
+    if (!supabase) throw new ServiceError("Supabase is not configured. Inventory cannot be created.", 503);
     const user = await requireUser(supabase);
     const enriched = enrich(payload, "");
     const { data, error } = await supabase.from("inventory_items").insert({
@@ -77,13 +69,7 @@ export const inventoryService = {
 
   async updateInventory(id: string, payload: InventoryInput) {
     const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      if (!inventoryStore.some((item) => item.id === id)) throw new ServiceError("Inventory item not found.", 404);
-      const product = enrich(payload, id);
-      inventoryStore = inventoryStore.map((item) => item.id === id ? product : item);
-      return product;
-    }
+    if (!supabase) throw new ServiceError("Supabase is not configured. Inventory cannot be updated.", 503);
     const user = await requireUser(supabase);
     const enriched = enrich(payload, id);
     const { data, error } = await supabase.from("inventory_items").update({
@@ -102,11 +88,7 @@ export const inventoryService = {
 
   async deleteInventory(id: string) {
     const supabase = optionalSupabase();
-    if (!supabase) {
-      await mockDelay();
-      inventoryStore = inventoryStore.filter((item) => item.id !== id);
-      return { success: true as const, id };
-    }
+    if (!supabase) throw new ServiceError("Supabase is not configured. Inventory cannot be deleted.", 503);
     const user = await requireUser(supabase);
     const { error } = await supabase.from("inventory_items").delete().eq("id", id).eq("vendor_id", user.id);
     throwDatabaseError(error, "The inventory item could not be deleted.");
@@ -114,8 +96,6 @@ export const inventoryService = {
   },
 
   async getForecasts() {
-    const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return stockForecasts.map((item) => ({ ...item })); }
     const products = await this.getInventory();
     return products.slice(0, 8).map((item) => ({
       product: item.name,
@@ -127,8 +107,6 @@ export const inventoryService = {
   },
 
   async getAlerts() {
-    const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return stockAlerts.map((item) => ({ ...item })); }
     const products = await this.getInventory();
     return products.filter((item) => item.risk !== "Low").map((item) => {
       const waste = Math.max(0, item.stock - item.forecast);
@@ -145,7 +123,7 @@ export const inventoryService = {
 
   async resolveAlert(product: string, action: string) {
     const supabase = optionalSupabase();
-    if (!supabase) { await mockDelay(); return { success: true as const, product, action }; }
+    if (!supabase) throw new ServiceError("Supabase is not configured. The stock action cannot be saved.", 503);
     const user = await requireUser(supabase);
     const { data: item } = await supabase.from("inventory_items").select("id").eq("vendor_id", user.id).eq("name", product).maybeSingle();
     const { error } = await supabase.from("stock_alert_actions").insert({

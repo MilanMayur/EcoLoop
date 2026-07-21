@@ -9,7 +9,6 @@ import {
   Navigation,
   Plus,
   Recycle,
-  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -187,6 +186,8 @@ function DashboardLoading() {
 
 function VendorOverview({ requests }: { requests: PickupRequest[] }) {
   const recent = requests.slice(0, 3);
+  const completed = requests.filter((item) => item.status.toLowerCase() === "completed").length;
+  const completionRate = requests.length ? Math.round((completed / requests.length) * 100) : 0;
   return (
     <>
       <div className="grid gap-3 sm:gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
@@ -289,23 +290,25 @@ function VendorOverview({ requests }: { requests: PickupRequest[] }) {
             </table>
           </div>
         </Panel>
-        <Panel title="Recycling score" subtitle="Based on your last 30 days">
+        <Panel title="Pickup completion" subtitle="Based on the recent requests shown">
           <div className="px-4 py-4 text-center sm:px-6 sm:py-7">
             <div className="relative mx-auto grid size-28 place-items-center rounded-full sm:size-40 border-[10px] border-emerald-100 dark:border-emerald-500/10 sm:border-[12px]">
               <div>
                 <p className="text-3xl font-semibold tracking-[-.06em] text-slate-950 dark:text-white sm:text-4xl">
-                  92
+                  {completionRate}%
                 </p>
                 <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 sm:text-[10px]">
-                  Excellent
+                  Completed
                 </p>
               </div>
               <div className="absolute -right-2 top-3 grid size-8 place-items-center rounded-xl bg-emerald-600 text-white shadow-lg sm:size-9">
-                <Sparkles className="size-4" />
+                <CheckCircle2 className="size-4" />
               </div>
             </div>
             <p className="mx-auto mt-3 max-w-52 text-[11px] leading-5 text-slate-500 sm:mt-6 sm:text-xs">
-              You segregated 94% of submitted waste correctly this month.
+              {requests.length
+                ? `${completed} of ${requests.length} recent pickup requests completed.`
+                : "No pickup history is available yet."}
             </p>
           </div>
         </Panel>

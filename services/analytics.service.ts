@@ -1,5 +1,4 @@
 import { adminExtraMetrics, metrics } from "@/data/dashboard";
-import { stockProducts } from "@/data/smart-stock";
 import type { DashboardRole } from "@/types/dashboard";
 import type {
   DashboardAnalytics,
@@ -10,7 +9,6 @@ import type {
   WasteTrendPoint,
 } from "@/types/mvp";
 import {
-  mockDelay,
   optionalSupabase,
   relativeTime,
   requireUser,
@@ -49,25 +47,6 @@ type RecoveryRow = {
   pickup_id: string;
   recovered_weight: number | string;
 };
-
-const fallbackInventoryDemand = [
-  { day: "Mon", inventory: 132, demand: 118 },
-  { day: "Tue", inventory: 148, demand: 126 },
-  { day: "Wed", inventory: 139, demand: 122 },
-  { day: "Thu", inventory: 158, demand: 131 },
-  { day: "Fri", inventory: 151, demand: 136 },
-  { day: "Sat", inventory: 172, demand: 154 },
-  { day: "Sun", inventory: 145, demand: 118 },
-];
-
-const fallbackMonthlyImpact = [
-  { month: "Feb", waste: 94, prevented: 42, savings: 8200, accuracy: 84 },
-  { month: "Mar", waste: 86, prevented: 58, savings: 10800, accuracy: 87 },
-  { month: "Apr", waste: 72, prevented: 74, savings: 12600, accuracy: 89 },
-  { month: "May", waste: 61, prevented: 96, savings: 14900, accuracy: 91 },
-  { month: "Jun", waste: 54, prevented: 112, savings: 16800, accuracy: 93 },
-  { month: "Jul", waste: 47, prevented: 138, savings: 18400, accuracy: 94 },
-];
 
 const colors = ["#16A34A", "#3B82F6", "#8B5CF6", "#F59E0B", "#0F766E"];
 
@@ -453,18 +432,10 @@ export const analyticsService = {
   async getSmartStockAnalytics(): Promise<SmartStockAnalytics> {
     const supabase = optionalSupabase();
     if (!supabase) {
-      await mockDelay();
-      return {
-        inventoryDemand: fallbackInventoryDemand,
-        monthlyImpact: fallbackMonthlyImpact,
-        topWaste: stockProducts
-          .filter((item) => item.stock > item.forecast)
-          .slice(0, 6)
-          .map((item) => ({
-            product: item.name,
-            potential: item.stock - item.forecast,
-          })),
-      };
+      throw new ServiceError(
+        "Supabase is not configured. Smart Stock analytics cannot be loaded.",
+        503,
+      );
     }
     const user = await requireUser(supabase);
     const { data, error } = await supabase
@@ -473,51 +444,16 @@ export const analyticsService = {
       .eq("vendor_id", user.id);
     throwDatabaseError(error, "Smart Stock analytics could not be loaded.");
     const products = data ?? [];
-    const totalStock = products.reduce(
-      (sum, item) => sum + Number(item.stock),
-      0,
-    );
-    const totalDemand = products.reduce(
-      (sum, item) => sum + Number(item.forecast),
-      0,
-    );
-    const inventoryDemand = [
-      "Mon",
-      "Tue",
-      "Wed",
-      "Thu",
-      "Fri",
-      "Sat",
-      "Sun",
-    ].map((day, index) => ({
-      day,
-      inventory: Math.round(totalStock * (0.9 + index * 0.02)),
-      demand: Math.round(totalDemand * (0.92 + index * 0.015)),
+    const inventoryDemand = products.map((item) => ({
+      day: String(item.name),
+      inventory: Number(item.stock),
+      demand: Number(item.forecast),
     }));
-    const prevented = products.reduce(
-      (sum, item) =>
-        sum + Math.max(0, Number(item.stock) - Number(item.forecast)),
-      0,
-    );
-    const savings = products.reduce(
-      (sum, item) =>
-        sum +
-        Math.max(0, Number(item.stock) - Number(item.forecast)) *
-          Number(item.price),
-      0,
-    );
-    const monthlyImpact = ["Feb", "Mar", "Apr", "May", "Jun", "Jul"].map(
-      (month, index) => ({
-        month,
-        waste: Math.max(0, Math.round(prevented * (1.3 - index * 0.1))),
-        prevented: Math.round(prevented * (0.5 + index * 0.1)),
-        savings: Math.round(savings * (0.55 + index * 0.09)),
-        accuracy: Math.min(96, 82 + index * 2),
-      }),
-    );
     return {
       inventoryDemand,
-      monthlyImpact,
+      // Historical impact requires recorded inventory outcomes. Do not infer a
+      // time series from the current inventory snapshot.
+      monthlyImpact: [],
       topWaste: products
         .map((item) => ({
           product: item.name,
