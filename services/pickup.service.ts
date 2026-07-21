@@ -30,6 +30,9 @@ type PickupRow = {
   completion_image_url: string | null;
   facility: string | null;
   status: PickupStatus;
+  cancellation_reason?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by_role?: "vendor" | "recycler" | "driver" | "admin" | null;
   recycler_id: string | null;
   created_at: string;
   assigned_driver_id: string | null;
@@ -114,6 +117,9 @@ const requestFromRow = (row: PickupRow, history: HistoryRow[] = []): PickupReque
   routeStopOrder: row.route_stop_order ?? undefined,
   vendorLatitude: row.vendor_latitude ?? undefined,
   vendorLongitude: row.vendor_longitude ?? undefined,
+  cancellationReason: row.cancellation_reason ?? [...history].reverse().find((item) => item.status === "cancelled")?.note ?? undefined,
+  cancelledByRole: row.cancelled_by_role ?? undefined,
+  cancelledAt: row.cancelled_at ?? undefined,
 });
 
 const jobFromRow = (row: PickupRow): PickupJob => ({
@@ -138,6 +144,9 @@ const jobFromRow = (row: PickupRow): PickupJob => ({
   routeStopOrder: row.route_stop_order ?? undefined,
   vendorLatitude: row.vendor_latitude ?? undefined,
   vendorLongitude: row.vendor_longitude ?? undefined,
+  cancellationReason: row.cancellation_reason ?? undefined,
+  cancelledByRole: row.cancelled_by_role ?? undefined,
+  cancelledAt: row.cancelled_at ?? undefined,
 });
 
 const pickupSelect = "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, recycler_id, created_at, assigned_driver_id, assigned_vehicle, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude";
@@ -269,6 +278,29 @@ export const pickupService = {
     });
     throwDatabaseError(error, "Pickup completion could not be recorded.");
     return jobFromRow(data as PickupRow);
+  },
+
+  async cancelPickup(referenceCode: string, reason?: string) {
+    const supabase = requirePickupClient();
+    await requireUser(supabase);
+    const id = await pickupId(referenceCode);
+    const { data, error } = await supabase.rpc("cancel_pickup", {
+      p_pickup_id: id,
+      p_reason: reason?.trim() || null,
+    });
+    if (error) {
+      const migrationMissing =
+        error.code === "PGRST202" ||
+        error.code === "42883" ||
+        error.message.toLowerCase().includes("cancel_pickup");
+      throw new ServiceError(
+        migrationMissing
+          ? "Pickup cancellation is not configured in Supabase. Run the latest cancellation migration."
+          : error.message || "The pickup could not be cancelled.",
+        migrationMissing ? 503 : 409,
+      );
+    }
+    return requestFromRow(data as PickupRow);
   },
 
   async getHistory() {

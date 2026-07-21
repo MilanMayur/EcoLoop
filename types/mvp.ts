@@ -39,6 +39,9 @@ export type PickupRequest = {
   distanceKm?: number;
   vendorLatitude?: number;
   vendorLongitude?: number;
+  cancellationReason?: string;
+  cancelledByRole?: DashboardRole;
+  cancelledAt?: string;
 };
 
 export type PickupJob = {
@@ -64,7 +67,8 @@ export type PickupJob = {
     | "In transit"
     | "Arrived"
     | "Collected"
-    | "Completed";
+    | "Completed"
+    | "Cancelled";
   assignedDriver?: string;
   assignedDriverId?: string;
   assignedVehicle?: string;
@@ -76,6 +80,9 @@ export type PickupJob = {
   vendorPhone?: string;
   vendorLatitude?: number;
   vendorLongitude?: number;
+  cancellationReason?: string;
+  cancelledByRole?: DashboardRole;
+  cancelledAt?: string;
 };
 
 export type PickupInput = {

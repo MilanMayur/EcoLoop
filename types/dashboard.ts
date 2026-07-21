@@ -4,7 +4,7 @@ export type DashboardRole = "vendor" | "recycler" | "driver" | "admin";
 export type NavItem = { label: string; href: string; icon: LucideIcon };
 export type Metric = { label: string; value: string; change: string; tone?: "green" | "blue" | "amber" | "violet"; icon: LucideIcon };
 export type RoleProfile = { role: DashboardRole; name: string; organization: string; shortRole: string; initials: string };
-export type Status = "Pending" | "Batching" | "Assigned" | "In transit" | "Arrived" | "Collected" | "Completed" | "Available" | "Accepted" | "Active" | "Delayed";
+export type Status = "Pending" | "Batching" | "Assigned" | "In transit" | "Arrived" | "Collected" | "Completed" | "Cancelled" | "Available" | "Accepted" | "Active" | "Delayed";
 
 export type StockRisk = "Low" | "Medium" | "High";
 export type StockProduct = {

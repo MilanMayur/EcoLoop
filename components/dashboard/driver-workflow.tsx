@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { LivePickupTracking } from "@/components/dashboard/live-tracking";
 import { usePickupRealtime } from "@/hooks/use-pickup-realtime";
 import { OPERATING_HOURS_LABEL } from "@/lib/operating-hours";
+import { PickupCancellationDialog } from "@/components/dashboard/pickup-cancellation-dialog";
 
 const inputClass =
   "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
@@ -256,6 +257,7 @@ export function AssignmentQueuePage() {
         loading={assignments.loading}
         error={assignments.error}
         title="Recently assigned jobs"
+        onCancelled={assignments.reload}
       />
       {toast && <Toast message={toast} onClose={() => setToast("")} />}
     </div>
@@ -645,6 +647,7 @@ export function PartnerAssignedJobsPage() {
         loading={resource.loading}
         error={resource.error}
         title="Active driver assignments"
+        onCancelled={resource.reload}
       />
     </div>
   );
@@ -771,61 +774,129 @@ function PartnerJobs({
   loading,
   error,
   title,
+  onCancelled,
 }: {
   jobs: PickupJob[];
   loading: boolean;
   error: string;
   title: string;
+  onCancelled?: () => void;
 }) {
+  const [cancellationTarget, setCancellationTarget] = useState<PickupJob | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancellationError, setCancellationError] = useState("");
+  const [toast, setToast] = useState("");
+
+  const cancelPickup = async (reason?: string) => {
+    if (!cancellationTarget || !reason) return;
+    setCancelling(true);
+    setCancellationError("");
+    try {
+      await pickupService.cancelPickup(cancellationTarget.id, reason);
+      setToast(`Pickup ${cancellationTarget.id} was cancelled and removed from the route.`);
+      setCancellationTarget(null);
+      onCancelled?.();
+    } catch (cause) {
+      setCancellationError(
+        cause instanceof Error ? cause.message : "The pickup could not be cancelled.",
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   return (
-    <Panel
-      title={title}
-      subtitle="Status updates come from the assigned driver"
-    >
-      {loading ? (
-        <div className="h-48 animate-pulse bg-slate-50 dark:bg-slate-950" />
-      ) : error ? (
-        <p className="p-6 text-center text-xs text-rose-600">{error}</p>
-      ) : jobs.length ? (
-        <div className="grid gap-2.5 p-3 sm:p-5">
-          {jobs.map((job) => (
-            <article
-              key={job.id}
-              className="rounded-xl border border-slate-100 p-3.5 dark:border-slate-800"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
-                    Stop {job.routeStopOrder ?? "—"}
-                  </p>
-                  <h3 className="mt-1 text-xs font-semibold">{job.vendor}</h3>
-                </div>
-                <StatusBadge status={job.status ?? "Assigned"} />
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] sm:grid-cols-4">
-                {[
-                  ["Driver", job.assignedDriver ?? "Assigned driver"],
-                  ["Vehicle", job.assignedVehicle ?? "—"],
-                  ["Waste", `${job.waste} · ${job.fillLevel}`],
-                  ["Location", job.location],
-                ].map(([key, value]) => (
-                  <div key={key}>
-                    <p className="text-slate-400">{key}</p>
-                    <p className="mt-1 font-semibold">{value}</p>
+    <>
+      <Panel
+        title={title}
+        subtitle="Status updates come from the assigned driver"
+      >
+        {loading ? (
+          <div className="h-48 animate-pulse bg-slate-50 dark:bg-slate-950" />
+        ) : error ? (
+          <p className="p-6 text-center text-xs text-rose-600">{error}</p>
+        ) : jobs.length ? (
+          <div className="grid gap-2.5 p-3 sm:p-5">
+            {jobs.map((job) => {
+              const canCancel = ["Assigned", "Accepted", "In transit", "Arrived"].includes(
+                job.status ?? "",
+              );
+              return (
+                <article
+                  key={job.id}
+                  className="rounded-xl border border-slate-100 p-3.5 dark:border-slate-800"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                        Stop {job.routeStopOrder ?? "—"}
+                      </p>
+                      <h3 className="mt-1 text-xs font-semibold">{job.vendor}</h3>
+                    </div>
+                    <StatusBadge status={job.status ?? "Assigned"} />
                   </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          icon={<ClipboardCheck className="size-5" />}
-          title="No active assignments"
-          description="Ready pickup batches will appear after Smart Auto Assignment runs."
-        />
-      )}
-    </Panel>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] sm:grid-cols-4">
+                    {[
+                      ["Driver", job.assignedDriver ?? "Assigned driver"],
+                      ["Vehicle", job.assignedVehicle ?? "—"],
+                      ["Waste", `${job.waste} · ${job.fillLevel}`],
+                      ["Location", job.location],
+                    ].map(([key, value]) => (
+                      <div key={key}>
+                        <p className="text-slate-400">{key}</p>
+                        <p className="mt-1 font-semibold">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {onCancelled && (
+                    <div className="mt-3 flex justify-end border-t border-slate-100 pt-3 dark:border-slate-800">
+                      {canCancel ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                          onClick={() => {
+                            setCancellationError("");
+                            setCancellationTarget(job);
+                          }}
+                        >
+                          Cancel for operational issue
+                        </Button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">
+                          Cancellation unavailable after collection
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<ClipboardCheck className="size-5" />}
+            title="No active assignments"
+            description="Ready pickup batches will appear after Smart Auto Assignment runs."
+          />
+        )}
+      </Panel>
+      <PickupCancellationDialog
+        open={Boolean(cancellationTarget)}
+        role="recycler"
+        referenceCode={cancellationTarget?.id ?? ""}
+        loading={cancelling}
+        error={cancellationError}
+        onClose={() => {
+          if (!cancelling) {
+            setCancellationError("");
+            setCancellationTarget(null);
+          }
+        }}
+        onConfirm={cancelPickup}
+      />
+      {toast && <Toast message={toast} onClose={() => setToast("")} />}
+    </>
   );
 }
 

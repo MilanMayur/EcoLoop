@@ -18,7 +18,7 @@ import { EmptyState, PageHeader, Panel, StatusBadge } from "@/components/dashboa
 import { roleProfiles } from "@/data/dashboard";
 import { cn } from "@/lib/utils";
 import type { DashboardRole } from "@/types/dashboard";
-import type { FillLevel, PickupJob } from "@/types/mvp";
+import type { FillLevel, PickupJob, PickupRequest } from "@/types/mvp";
 import { analyticsService } from "@/services/analytics.service";
 import { authService } from "@/services/auth.service";
 import { pickupService } from "@/services/pickup.service";
@@ -37,6 +37,7 @@ import { LivePickupTracking } from "@/components/dashboard/live-tracking";
 import { usePickupRealtime } from "@/hooks/use-pickup-realtime";
 import { isWithinOperatingHours } from "@/lib/operating-hours";
 import { SupportRequestsPage } from "@/components/dashboard/support-requests-page";
+import { PickupCancellationDialog } from "@/components/dashboard/pickup-cancellation-dialog";
 
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
 const labelClass = "text-xs font-semibold text-slate-700 dark:text-slate-300";
@@ -218,15 +219,44 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
   const [status, setStatus] = useState("All statuses");
   const [sort, setSort] = useState("Newest");
   const [page, setPage] = useState(1);
+  const [cancellationTarget, setCancellationTarget] = useState<PickupRequest | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancellationError, setCancellationError] = useState("");
+  const [toast, setToast] = useState("");
+  const canCancel = (item: PickupRequest) =>
+    !history &&
+    (admin
+      ? ["Pending", "Assigned", "Accepted", "In transit", "Arrived"].includes(item.status)
+      : item.status === "Pending");
+  const cancelPickup = async (reason?: string) => {
+    if (!cancellationTarget) return;
+    setCancelling(true);
+    setCancellationError("");
+    try {
+      await pickupService.cancelPickup(cancellationTarget.id, reason);
+      resource.reload();
+      setToast(`Pickup ${cancellationTarget.id} was cancelled.`);
+      setCancellationTarget(null);
+    } catch (cause) {
+      setCancellationError(
+        cause instanceof Error ? cause.message : "The pickup could not be cancelled.",
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
   const filtered = useMemo(() => (resource.data ?? [])
     .filter((row) => !history || row.status === "Completed")
     .filter((row) => status === "All statuses" || row.status === status)
     .filter((row) => includesSearch([row.id, row.waste, row.recycler], search))
     .sort((a, b) => sort === "Newest" ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)), [resource.data, history, search, sort, status]);
   const pageInfo = paginate(filtered, page, 5);
-  const headers = admin
-    ? ["Request ID", "Waste type", "Fill level", "Actual weight", "Pickup photo", "Completion photo", "Status", "Status timeline"]
-    : ["Request ID", "Waste type", "Fill level", "Actual weight", "Assigned recycler", "Status", "Created time", "ETA"];
+  const headers = [
+    ...(admin
+      ? ["Request ID", "Waste type", "Fill level", "Actual weight", "Pickup photo", "Completion photo", "Status", "Status timeline"]
+      : ["Request ID", "Waste type", "Fill level", "Actual weight", "Assigned recycler", "Status", "Created time", "ETA"]),
+    ...(!history ? ["Actions"] : []),
+  ];
   const activeTrackingRequest = filtered.find(
     (item) =>
       item.assignedDriverId &&
@@ -248,34 +278,149 @@ function RequestsPage({ history, admin = false }: { history: boolean; admin?: bo
       <Panel>
         <div className="grid grid-cols-2 gap-2 border-b border-slate-100 p-3 dark:border-slate-800 sm:flex sm:gap-3 sm:p-4">
           <input aria-label="Search requests" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search request ID…" className={`${inputClass} col-span-2 mt-0 h-10 text-sm sm:max-w-xs`} />
-          <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)} className={`${inputClass} mt-0 h-10 text-sm sm:ml-auto sm:w-40`}><option>All statuses</option><option>Pending</option><option>Assigned</option><option>In transit</option><option>Completed</option></select>
+          <select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)} className={`${inputClass} mt-0 h-10 text-sm sm:ml-auto sm:w-40`}><option>All statuses</option><option>Pending</option><option>Assigned</option><option>Accepted</option><option>In transit</option><option>Arrived</option><option>Collected</option><option>Completed</option><option>Cancelled</option></select>
           <select aria-label="Sort requests" value={sort} onChange={(event) => setSort(event.target.value)} className={`${inputClass} mt-0 h-10 text-sm sm:w-32`}><option>Newest</option><option>Oldest</option></select>
         </div>
         {resource.loading ? <div className="h-40 animate-pulse bg-slate-50 dark:bg-slate-900 sm:h-56" /> : resource.error ? <div className="p-5 text-center sm:p-8"><p className="text-[11px] text-rose-600 sm:text-xs">{resource.error}</p><Button size="sm" variant="outline" className="mt-3 sm:mt-4" onClick={resource.reload}>Try again</Button></div> : pageInfo.rows.length ? <>
-          <div className="grid gap-2 p-2.5 sm:hidden">{pageInfo.rows.map((item) => <article key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/50"><div className="flex items-start justify-between gap-2"><div><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Pickup request</p><h3 className="mt-0.5 text-xs font-semibold">{item.id}</h3></div><StatusBadge status={item.status} /></div><div className="mt-2.5 grid grid-cols-2 gap-2 text-[10px]"><div><p className="text-slate-400">Waste type</p><p className="mt-0.5 font-semibold">{item.waste}</p></div><div><p className="text-slate-400">Fill level</p><p className="mt-0.5 font-semibold">{item.fillLevel}</p></div><div><p className="text-slate-400">Actual weight</p><p className="mt-0.5 font-semibold">{item.actualWeight ? `${item.actualWeight} kg` : "Pending"}</p></div><div><p className="text-slate-400">Requested</p><p className="mt-0.5 font-semibold">{item.time}</p></div></div>{admin ? <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800"><PickupPhoto url={item.imageUrl} alt={`Pickup ${item.id}`} /><PickupPhoto url={item.completionImageUrl} alt={`Completed pickup ${item.id}`} /><span className="ml-auto text-[9px] text-slate-400">Pickup · Completion</span></div> : <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[10px] dark:border-slate-800"><span className="truncate text-slate-400">{item.recycler}</span><span className="shrink-0 font-semibold">ETA {item.eta}</span></div>}</article>)}</div>
-          <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[1050px] text-left">
-            <thead><tr className="border-b border-slate-100 text-[9px] uppercase tracking-wider text-slate-400 dark:border-slate-800">{headers.map((heading) => <th key={heading} className="px-6 py-3 font-semibold">{heading}</th>)}</tr></thead>
-            <tbody>{pageInfo.rows.map((item) => <tr key={item.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
-              <td className="px-6 py-4 text-xs font-semibold">{item.id}</td>
-              <td className="px-6 py-4 text-xs font-medium">{item.waste}</td>
-              <td className="px-6 py-4 text-xs font-semibold">{item.fillLevel}</td>
-              <td className="px-6 py-4 text-xs text-slate-500">{item.actualWeight ? `${item.actualWeight} kg` : "Pending collection"}</td>
-              {admin ? <>
-                <td className="px-6 py-4"><PickupPhoto url={item.imageUrl} alt={`Pickup ${item.id}`} /></td>
-                <td className="px-6 py-4"><PickupPhoto url={item.completionImageUrl} alt={`Completed pickup ${item.id}`} /></td>
-                <td className="px-6 py-4"><StatusBadge status={item.status} /></td>
-                <td className="px-6 py-4"><div className="min-w-36 space-y-1">{item.timeline?.map((event, index) => <p key={`${event.status}-${index}`} className="text-[10px] text-slate-500"><span className="font-semibold text-slate-700 dark:text-slate-200">{event.status}</span> · {event.time}</p>)}</div></td>
-              </> : <>
-                <td className="px-6 py-4 text-xs text-slate-500">{item.recycler}</td>
-                <td className="px-6 py-4"><StatusBadge status={item.status} /></td>
-                <td className="px-6 py-4 text-xs text-slate-500">{item.time}</td>
-                <td className="px-6 py-4 text-xs font-medium text-slate-700 dark:text-slate-200">{item.eta}</td>
-              </>}
-            </tr>)}</tbody>
-          </table></div>
+          <div className="grid gap-2 p-2.5 sm:hidden">
+            {pageInfo.rows.map((item) => (
+              <article key={item.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/50">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Pickup request</p>
+                    <h3 className="mt-0.5 text-xs font-semibold">{item.id}</h3>
+                  </div>
+                  <StatusBadge status={item.status} />
+                </div>
+                <div className="mt-2.5 grid grid-cols-2 gap-2 text-[10px]">
+                  <div><p className="text-slate-400">Waste type</p><p className="mt-0.5 font-semibold">{item.waste}</p></div>
+                  <div><p className="text-slate-400">Fill level</p><p className="mt-0.5 font-semibold">{item.fillLevel}</p></div>
+                  <div><p className="text-slate-400">Actual weight</p><p className="mt-0.5 font-semibold">{item.actualWeight ? `${item.actualWeight} kg` : "Pending"}</p></div>
+                  <div><p className="text-slate-400">Requested</p><p className="mt-0.5 font-semibold">{item.time}</p></div>
+                </div>
+                {item.status === "Cancelled" && item.cancellationReason && (
+                  <p className="mt-2.5 rounded-lg bg-rose-50 px-2.5 py-2 text-[10px] leading-4 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+                    <span className="font-semibold">Cancellation reason:</span> {item.cancellationReason}
+                  </p>
+                )}
+                {admin ? (
+                  <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                    <PickupPhoto url={item.imageUrl} alt={`Pickup ${item.id}`} />
+                    <PickupPhoto url={item.completionImageUrl} alt={`Completed pickup ${item.id}`} />
+                    <span className="ml-auto text-[9px] text-slate-400">Pickup · Completion</span>
+                  </div>
+                ) : (
+                  <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[10px] dark:border-slate-800">
+                    <span className="truncate text-slate-400">{item.recycler}</span>
+                    <span className="shrink-0 font-semibold">ETA {item.eta}</span>
+                  </div>
+                )}
+                {canCancel(item) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3 w-full border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300"
+                    onClick={() => {
+                      setCancellationError("");
+                      setCancellationTarget(item);
+                    }}
+                  >
+                    Cancel request
+                  </Button>
+                )}
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="w-full min-w-[1050px] text-left">
+              <thead>
+                <tr className="border-b border-slate-100 text-[9px] uppercase tracking-wider text-slate-400 dark:border-slate-800">
+                  {headers.map((heading) => <th key={heading} className="px-6 py-3 font-semibold">{heading}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {pageInfo.rows.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                    <td className="px-6 py-4 text-xs font-semibold">{item.id}</td>
+                    <td className="px-6 py-4 text-xs font-medium">{item.waste}</td>
+                    <td className="px-6 py-4 text-xs font-semibold">{item.fillLevel}</td>
+                    <td className="px-6 py-4 text-xs text-slate-500">{item.actualWeight ? `${item.actualWeight} kg` : "Pending collection"}</td>
+                    {admin ? (
+                      <>
+                        <td className="px-6 py-4"><PickupPhoto url={item.imageUrl} alt={`Pickup ${item.id}`} /></td>
+                        <td className="px-6 py-4"><PickupPhoto url={item.completionImageUrl} alt={`Completed pickup ${item.id}`} /></td>
+                        <td className="px-6 py-4">
+                          <StatusBadge status={item.status} />
+                          {item.status === "Cancelled" && item.cancellationReason && (
+                            <p className="mt-1.5 max-w-48 text-[10px] leading-4 text-rose-600 dark:text-rose-300">{item.cancellationReason}</p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="min-w-36 space-y-1">
+                            {item.timeline?.map((event, index) => (
+                              <p key={`${event.status}-${index}`} className="text-[10px] text-slate-500">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">{event.status}</span> · {event.time}
+                                {event.note && <span className="block max-w-52 leading-4 text-rose-600 dark:text-rose-300">{event.note}</span>}
+                              </p>
+                            ))}
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-6 py-4 text-xs text-slate-500">{item.recycler}</td>
+                        <td className="px-6 py-4">
+                          <StatusBadge status={item.status} />
+                          {item.status === "Cancelled" && item.cancellationReason && (
+                            <p className="mt-1.5 max-w-48 text-[10px] leading-4 text-rose-600 dark:text-rose-300">{item.cancellationReason}</p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-500">{item.time}</td>
+                        <td className="px-6 py-4 text-xs font-medium text-slate-700 dark:text-slate-200">{item.eta}</td>
+                      </>
+                    )}
+                    {!history && (
+                      <td className="px-6 py-4">
+                        {canCancel(item) ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                            onClick={() => {
+                              setCancellationError("");
+                              setCancellationTarget(item);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">Not available</span>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 text-[10px] text-slate-400 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><span>{pageInfo.total} request{pageInfo.total === 1 ? "" : "s"}</span><div className="flex items-center justify-between gap-2 sm:justify-end"><Button size="sm" variant="outline" disabled={pageInfo.page === 1} onClick={() => setPage(pageInfo.page - 1)}>Previous</Button><span>Page {pageInfo.page} of {pageInfo.totalPages}</span><Button size="sm" variant="outline" disabled={pageInfo.page === pageInfo.totalPages} onClick={() => setPage(pageInfo.page + 1)}>Next</Button></div></div>
         </> : <EmptyState icon={<ClipboardCheck className="size-5" />} title="No requests found" description="Try changing the search or status filter." />}
       </Panel>
+      <PickupCancellationDialog
+        open={Boolean(cancellationTarget)}
+        role={admin ? "admin" : "vendor"}
+        referenceCode={cancellationTarget?.id ?? ""}
+        loading={cancelling}
+        error={cancellationError}
+        onClose={() => {
+          if (!cancelling) {
+            setCancellationError("");
+            setCancellationTarget(null);
+          }
+        }}
+        onConfirm={cancelPickup}
+      />
+      {toast && <Toast message={toast} onClose={() => setToast("")} />}
     </div>
   );
 }
