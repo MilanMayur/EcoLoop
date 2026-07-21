@@ -15,7 +15,7 @@ const LiveTrackingMap = dynamic(
     ),
   {
     ssr: false,
-    loading: () => <div className="h-64 animate-pulse bg-slate-100 sm:h-80 dark:bg-slate-950" />,
+    loading: () => <div className="h-52 animate-pulse bg-slate-100 sm:h-80 dark:bg-slate-950" />,
   },
 );
 
@@ -166,9 +166,9 @@ export function LivePickupTracking({
       }
     >
       {loading ? (
-        <div className="h-64 animate-pulse bg-slate-100 sm:h-80 dark:bg-slate-950" />
+        <div className="h-52 animate-pulse bg-slate-100 sm:h-80 dark:bg-slate-950" />
       ) : error ? (
-        <div className="p-5 text-center text-xs text-rose-600">{error}</div>
+        <div className="p-4 text-center text-xs sm:p-5 text-rose-600">{error}</div>
       ) : (
         <div className={cn("grid", !compact && "xl:grid-cols-[1fr_16rem]")}>
           <LiveTrackingMap

@@ -238,7 +238,7 @@ export function DashboardShell({ role, children }: { role: DashboardRole; childr
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1500px] px-3 pb-24 pt-4 sm:p-6 lg:p-8">{children}</main>
+        <main className={cn("mx-auto max-w-[1500px] pb-24 sm:p-6 lg:p-8", role === "vendor" ? "px-2.5 pt-3" : "px-3 pt-4")}>{children}</main>
       </div>
 
       <MobileBottomNavigation role={role} onNavigate={closeMobileLayers} />

@@ -31,7 +31,7 @@ const schemas = {
   chatAssistant: { type: "object", additionalProperties: false, properties: { reply: { type: "string" }, suggestedActions: { type: "array", items: { type: "string" } } }, required: ["reply", "suggestedActions"] },
 } as const;
 
-type RawResponse = { output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>; error?: { message?: string } };
+type RawResponse = { output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>; choices?: Array<{ message?: { content?: string; tool_calls?: Array<{ function?: { arguments?: string } }> } }>; error?: { message?: string } };
 const rateLimits = new Map<string, { count: number; resetAt: number }>();
 
 function validatePayload(action: AIAction, payload: unknown) {
@@ -63,33 +63,57 @@ function checkRateLimit(userId: string) {
 }
 
 function outputText(response: RawResponse) {
-  return response.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
+  return response.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text ?? response.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? response.choices?.[0]?.message?.content;
 }
 
-async function callOpenAI(action: AIAction, payload: unknown) {
-  const apiKey = process.env.OPENAI_API_KEY;
+async function callGroq(action: AIAction, payload: unknown) {
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error("AI_NOT_CONFIGURED");
   const isImage = action === "analyzeWasteImage";
-  const input = isImage
-    ? [{ role: "user", content: [{ type: "input_text", text: AI_INPUT_PROMPTS.analyzeWasteImage }, { type: "input_image", image_url: (payload as { imageDataUrl: string }).imageDataUrl }] }]
-    : JSON.stringify(payload);
-  const body = {
-    model: process.env.OPENAI_MODEL || "gpt-5.6",
-    instructions: AI_PROMPTS[action],
-    input,
-    text: { format: { type: "json_schema", name: `ecoloop_${action}`, strict: true, schema: schemas[action] } },
-    max_output_tokens: action === "generateWeeklyReport" ? 1400 : 900,
-  };
-
+  const body = isImage
+    ? {
+        model: process.env.GROQ_VISION_MODEL || "qwen/qwen3.6-27b",
+        messages: [
+          { role: "system", content: `${AI_PROMPTS[action]}\nAnalyze the image, then call submit_waste_analysis with concise field values.` },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: AI_INPUT_PROMPTS.analyzeWasteImage },
+              { type: "image_url", image_url: { url: (payload as { imageDataUrl: string }).imageDataUrl } },
+            ],
+          },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "submit_waste_analysis",
+              description: "Submit the structured EcoLoop waste-image analysis.",
+              parameters: schemas.analyzeWasteImage,
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "submit_waste_analysis" } },
+        temperature: 0.2,
+        top_p: 0.8,
+        max_completion_tokens: 900,
+      }
+    : {
+        model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+        instructions: AI_PROMPTS[action],
+        input: JSON.stringify(payload),
+        text: { format: { type: "json_schema", name: `ecoloop_${action}`, strict: true, schema: schemas[action] } },
+        max_output_tokens: action === "generateWeeklyReport" ? 1400 : 900,
+      };
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25_000);
     try {
-      const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
+      const response = await fetch(isImage ? "https://api.groq.com/openai/v1/chat/completions" : "https://api.groq.com/openai/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
       const json = await response.json() as RawResponse;
       if (!response.ok) {
-        lastError = new Error(json.error?.message || `OpenAI request failed (${response.status}).`);
+        lastError = new Error(json.error?.message || `Groq request failed (${response.status}).`);
         if ((response.status === 429 || response.status >= 500) && attempt === 0) { await new Promise((resolve) => setTimeout(resolve, 500)); continue; }
         throw lastError;
       }
@@ -117,7 +141,7 @@ export async function POST(request: Request) {
     const parsed = requestSchema.parse(await request.json());
     const payload = validatePayload(parsed.action, parsed.payload);
     if (parsed.action !== "analyzeWasteImage" && JSON.stringify(payload).length > 120_000) return NextResponse.json({ error: "The AI context is too large." }, { status: 413 });
-    const result = await callOpenAI(parsed.action, payload);
+    const result = await callGroq(parsed.action, payload);
     if (parsed.action === "generateSmartScore") return NextResponse.json({ ...(payload as DeterministicSmartScore), ...result });
     if (parsed.action === "generateWeeklyReport") return NextResponse.json({ ...result, generatedAt: new Date().toISOString() });
     return NextResponse.json(result);

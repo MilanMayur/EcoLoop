@@ -18,7 +18,7 @@ EcoLoop is an AI-assisted civic-tech platform connecting market vendors, authori
 - Next.js 16, React 19, TypeScript, and Tailwind CSS
 - Supabase Auth, Postgres, Storage, Realtime, RPC functions, and Row Level Security
 - Leaflet for live pickup and driver tracking
-- OpenAI through a server-only Next.js API route
+- Groq through a server-only Next.js API route
 
 The frontend connects directly to Supabase for authorized application data. Sensitive operations, including driver invitations and AI requests, use server-side routes. There is no n8n backend.
 
@@ -42,11 +42,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
 # Server-only: AI features
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.6
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_VISION_MODEL=qwen/qwen3.6-27b
 ```
 
-A Supabase publishable key can be used as `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put the service-role or OpenAI key in a `NEXT_PUBLIC_` variable, commit `.env.local`, or expose either key in browser code.
+A Supabase publishable key can be used as `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Never put the service-role or Groq key in a `NEXT_PUBLIC_` variable, commit `.env.local`, or expose either key in browser code.
 
 ### 3. Apply the Supabase schema
 
@@ -140,6 +141,6 @@ pnpm start               # Run the production build
 
 - Browser code uses only the Supabase URL and publishable/anon key.
 - Row Level Security and scoped RPC functions enforce database authorization.
-- Service-role and OpenAI keys remain server-only.
+- Service-role and Groq keys remain server-only.
 - Pickup and completion photos live in Supabase Storage; database rows store URLs.
 - AI input is validated and provider requests pass through `/api/ai`.

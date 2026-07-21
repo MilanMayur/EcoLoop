@@ -101,7 +101,7 @@ export function RoleOverview({ role }: { role: DashboardRole }) {
       ? content.eyebrow
       : profile?.organization || content.eyebrow;
   return (
-    <div className="space-y-5 sm:space-y-8">
+    <div className="space-y-3 sm:space-y-8">
       <PageHeader
         eyebrow={eyebrow}
         title={title}
@@ -153,7 +153,7 @@ function DashboardContent({
 }) {
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         {data.metrics.map((metric, index) => (
           <MetricCard key={metric.label} metric={metric} index={index} />
         ))}
@@ -174,7 +174,7 @@ function DashboardContent({
 
 function DashboardLoading() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
       {Array.from({ length: 4 }, (_, index) => (
         <div
           key={index}
@@ -189,7 +189,7 @@ function VendorOverview({ requests }: { requests: PickupRequest[] }) {
   const recent = requests.slice(0, 3);
   return (
     <>
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
+      <div className="grid gap-3 sm:gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
         <Panel
           title="Recent pickup requests"
           subtitle="Your latest collection activity"
@@ -202,11 +202,11 @@ function VendorOverview({ requests }: { requests: PickupRequest[] }) {
             </Link>
           }
         >
-          <div className="grid gap-2.5 p-3 sm:hidden">
+          <div className="grid gap-2 p-2.5 sm:hidden">
             {recent.map((item) => (
               <article
                 key={item.id}
-                className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-950/50"
+                className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/50"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -290,8 +290,8 @@ function VendorOverview({ requests }: { requests: PickupRequest[] }) {
           </div>
         </Panel>
         <Panel title="Recycling score" subtitle="Based on your last 30 days">
-          <div className="px-5 py-5 text-center sm:px-6 sm:py-7">
-            <div className="relative mx-auto grid size-32 place-items-center rounded-full border-[10px] border-emerald-100 dark:border-emerald-500/10 sm:size-40 sm:border-[12px]">
+          <div className="px-4 py-4 text-center sm:px-6 sm:py-7">
+            <div className="relative mx-auto grid size-28 place-items-center rounded-full sm:size-40 border-[10px] border-emerald-100 dark:border-emerald-500/10 sm:border-[12px]">
               <div>
                 <p className="text-3xl font-semibold tracking-[-.06em] text-slate-950 dark:text-white sm:text-4xl">
                   92
@@ -304,13 +304,13 @@ function VendorOverview({ requests }: { requests: PickupRequest[] }) {
                 <Sparkles className="size-4" />
               </div>
             </div>
-            <p className="mx-auto mt-4 max-w-52 text-[11px] leading-5 text-slate-500 sm:mt-6 sm:text-xs">
+            <p className="mx-auto mt-3 max-w-52 text-[11px] leading-5 text-slate-500 sm:mt-6 sm:text-xs">
               You segregated 94% of submitted waste correctly this month.
             </p>
           </div>
         </Panel>
       </div>
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
+      <div className="grid gap-3 sm:gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
         <Panel
           title="Monthly waste"
           subtitle="Collected and successfully recycled"
@@ -333,7 +333,7 @@ function VendorOverview({ requests }: { requests: PickupRequest[] }) {
 export function RecyclerOverview({ jobs }: { jobs: PickupJob[] }) {
   return (
     <>
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
+      <div className="grid gap-3 sm:gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
         <Panel
           title="Nearby pickup opportunities"
           subtitle="Matched to your vehicle and material capabilities"
@@ -540,7 +540,7 @@ function AdminOverview({
           </div>
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
+      <div className="grid gap-3 sm:gap-4 xl:grid-cols-[1.45fr_.55fr] xl:gap-5">
         <Panel
           title="Daily collection performance"
           subtitle="Waste collected and recovered across all active markets"
@@ -567,11 +567,11 @@ function AdminOverview({
           </Link>
         }
       >
-        <div className="grid gap-2.5 p-3 sm:hidden">
+        <div className="grid gap-2 p-2.5 sm:hidden">
           {visibleMarkets.map((item) => (
             <article
               key={item.market}
-              className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-950/50"
+              className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/50"
             >
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-xs font-semibold">{item.market}</h3>
