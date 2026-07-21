@@ -11,6 +11,7 @@ import {
   Check,
   ClipboardCheck,
   Clock3,
+  Coffee,
   Gauge,
   Mail,
   MapPin,
@@ -97,6 +98,161 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
         ×
       </button>
     </div>
+  );
+}
+
+const breakReasons = [
+  "Meal or rest",
+  "Hydration break",
+  "Fuel or charging",
+  "Vehicle check",
+  "Personal break",
+] as const;
+
+function breakTime(value?: string) {
+  if (!value) return "Not recorded";
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function DriverBreakDetails({ driver }: { driver: Driver }) {
+  if (driver.status !== "On break") return null;
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[10px] text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+      <div className="flex items-center gap-2 font-semibold">
+        <Coffee className="size-3.5" />
+        {driver.breakReason ?? "Scheduled break"}
+      </div>
+      <p className="mt-1.5">
+        Started {breakTime(driver.breakStartedAt)} · Expected back {breakTime(driver.breakExpectedEndAt)}
+      </p>
+      {driver.breakNotes && <p className="mt-1.5 leading-4">{driver.breakNotes}</p>}
+    </div>
+  );
+}
+
+function DriverBreakControl({
+  driver,
+  jobs,
+  onChanged,
+  onMessage,
+}: {
+  driver: Driver;
+  jobs: PickupJob[];
+  onChanged: (driver: Driver) => void;
+  onMessage: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<(typeof breakReasons)[number]>(breakReasons[0]);
+  const [durationMinutes, setDurationMinutes] = useState(30);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const activeStage = jobs.some(
+    (job) => job.status === "In transit" || job.status === "Arrived",
+  );
+
+  const start = async () => {
+    setSaving(true);
+    try {
+      const updated = await driverService.startBreak({
+        reason,
+        durationMinutes,
+        notes: notes.trim() || undefined,
+      });
+      onChanged(updated);
+      setOpen(false);
+      setNotes("");
+      onMessage(`Break started. Expected back at ${breakTime(updated.breakExpectedEndAt)}.`);
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "The break could not be started.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const end = async () => {
+    setSaving(true);
+    try {
+      const updated = await driverService.endBreak();
+      onChanged(updated);
+      onMessage("Break ended. You are available for route work again.");
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "The break could not be ended.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (driver.status === "On break") {
+    return (
+      <Panel
+        title="Break in progress"
+        subtitle="Your partner company and BBMP can see this live status."
+        action={
+          <Button size="sm" disabled={saving} onClick={() => void end()}>
+            <Coffee className="size-4" /> {saving ? "Ending…" : "End break"}
+          </Button>
+        }
+      >
+        <div className="p-4 sm:p-5">
+          <DriverBreakDetails driver={driver} />
+          <p className="mt-3 text-[10px] leading-4 text-slate-500">
+            Existing assignments stay reserved, but pickup progress and new assignments remain paused until you end the break.
+          </p>
+        </div>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel
+      title="Driver availability"
+      subtitle="Take a timed break between active collection stages."
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={activeStage}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <Coffee className="size-4" /> {open ? "Close" : "Take a break"}
+        </Button>
+      }
+    >
+      {activeStage ? (
+        <p className="p-4 text-[10px] leading-4 text-amber-700 dark:text-amber-300 sm:p-5">
+          Finish the current in-transit or arrived pickup stage before starting a break.
+        </p>
+      ) : open ? (
+        <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+          <label className={labelClass}>
+            Reason
+            <select value={reason} onChange={(event) => setReason(event.target.value as typeof reason)} className={inputClass}>
+              {breakReasons.map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className={labelClass}>
+            Duration
+            <select value={durationMinutes} onChange={(event) => setDurationMinutes(Number(event.target.value))} className={inputClass}>
+              {[15, 30, 45, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}
+            </select>
+          </label>
+          <label className={`${labelClass} sm:col-span-2`}>
+            Notes (optional)
+            <textarea value={notes} maxLength={500} rows={2} onChange={(event) => setNotes(event.target.value)} className={`${inputClass} h-auto py-3`} />
+          </label>
+          <Button className="sm:col-span-2" disabled={saving} onClick={() => void start()}>
+            <Coffee className="size-4" /> {saving ? "Starting…" : "Start timed break"}
+          </Button>
+        </div>
+      ) : (
+        <p className="p-4 text-[10px] leading-4 text-slate-500 sm:p-5">
+          Starting a break pauses new assignments. Pickups already assigned to you remain reserved.
+        </p>
+      )}
+    </Panel>
   );
 }
 
@@ -270,6 +426,13 @@ export function DriverManagementPage() {
     () => driverService.getDrivers(),
     "drivers",
   );
+  useEffect(() => {
+    try {
+      return driverService.subscribeToDrivers(resource.reload);
+    } catch {
+      return undefined;
+    }
+  }, [resource.reload]);
   const performance = useAsyncResource(
     () => driverService.getPerformance(),
     "driver-performance",
@@ -443,6 +606,7 @@ export function DriverManagementPage() {
                       />
                     </div>
                   </div>
+                  <DriverBreakDetails driver={driver} />
                   <div className="mt-4 flex gap-2">
                     <Button
                       size="sm"
@@ -910,6 +1074,13 @@ export function FleetOverviewPage() {
     ]);
     return { overview, drivers, performance };
   }, "fleet-overview");
+  useEffect(() => {
+    try {
+      return driverService.subscribeToDrivers(resource.reload);
+    } catch {
+      return undefined;
+    }
+  }, [resource.reload]);
   if (resource.loading)
     return (
       <div className="h-72 animate-pulse rounded-xl bg-white dark:bg-slate-900" />
@@ -992,6 +1163,7 @@ export function FleetOverviewPage() {
                 <p className="mt-2 text-[9px] text-slate-400">
                   {driver.currentLoadKg} kg onboard · {driver.reservedLoadKg} kg reserved · {driver.capacityKg} kg capacity
                 </p>
+                <DriverBreakDetails driver={driver} />
               </div>
             );
           })}
@@ -1087,6 +1259,73 @@ export function FleetOverviewPage() {
   );
 }
 
+export function DriverBreakOversight() {
+  const resource = useAsyncResource(
+    () => driverService.getDrivers(),
+    "admin-driver-breaks",
+  );
+  useEffect(() => {
+    try {
+      return driverService.subscribeToDrivers(resource.reload);
+    } catch {
+      return undefined;
+    }
+  }, [resource.reload]);
+  const activeBreaks = (resource.data ?? []).filter(
+    (driver) => driver.status === "On break",
+  );
+
+  return (
+    <Panel
+      title="Driver breaks"
+      subtitle="Live break status across recycling partner fleets"
+      action={
+        <span className="text-[10px] font-semibold text-slate-500">
+          {activeBreaks.length} active
+        </span>
+      }
+    >
+      {resource.loading ? (
+        <div className="h-24 animate-pulse bg-slate-50 dark:bg-slate-950" />
+      ) : resource.error ? (
+        <div className="p-4 text-center sm:p-5">
+          <p className="text-xs text-rose-600">{resource.error}</p>
+          <Button size="sm" variant="outline" className="mt-3" onClick={resource.reload}>
+            Try again
+          </Button>
+        </div>
+      ) : activeBreaks.length ? (
+        <div className="grid gap-2.5 p-3 md:grid-cols-2 xl:grid-cols-3 sm:p-5">
+          {activeBreaks.map((driver) => (
+            <article key={driver.id} className="rounded-xl border border-amber-200 p-3.5 dark:border-amber-500/20">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold">{driver.name}</p>
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    {driver.vehicleNumber} · {driver.vehicleType}
+                  </p>
+                </div>
+                <StatusBadge status="On break" />
+              </div>
+              <DriverBreakDetails driver={driver} />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 p-4 sm:p-5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10">
+            <Coffee className="size-4" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold">No drivers on break</p>
+            <p className="mt-1 text-[10px] text-slate-500">All reported drivers are in their current working status.</p>
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export function DriverWorkflowSection({ section }: { section: string }) {
   if (section === "jobs") return <DriverJobsPage />;
   if (section === "route") return <DriverRoutePage />;
@@ -1159,6 +1398,13 @@ function DriverJobsPage() {
     "driver-current-vehicle",
   );
   usePickupRealtime(resource.reload);
+  useEffect(() => {
+    try {
+      return driverService.subscribeToDrivers(vehicle.reload);
+    } catch {
+      return undefined;
+    }
+  }, [vehicle.reload]);
   const [updating, setUpdating] = useState("");
   const [collecting, setCollecting] = useState<PickupJob | null>(null);
   const [collectionPhoto, setCollectionPhoto] = useState<File | null>(null);
@@ -1315,6 +1561,14 @@ function DriverJobsPage() {
         title="Assigned pickups"
         description="Collected waste remains onboard until you record delivery at the destination facility."
       />
+      {currentVehicle && (
+        <DriverBreakControl
+          driver={currentVehicle}
+          jobs={jobs}
+          onChanged={vehicle.setData}
+          onMessage={setToast}
+        />
+      )}
       <Panel
         title="Vehicle load"
         subtitle={
@@ -1451,10 +1705,14 @@ function DriverJobsPage() {
                 <PickupStatusTimeline status={job.status} />
                 <Button
                   className="mt-4 w-full"
-                  disabled={updating === job.id}
+                  disabled={updating === job.id || currentVehicle?.status === "On break"}
                   onClick={() => void advance(job)}
                 >
-                  {updating === job.id ? "Updating…" : actionLabel(job.status)}
+                  {currentVehicle?.status === "On break"
+                    ? "End break to continue"
+                    : updating === job.id
+                      ? "Updating…"
+                      : actionLabel(job.status)}
                 </Button>
               </div>
             </Panel>

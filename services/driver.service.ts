@@ -1,5 +1,6 @@
 import type {
   Driver,
+  DriverBreakInput,
   DriverInput,
   DriverPerformance,
   FleetOverview,
@@ -39,6 +40,10 @@ type DriverRow = {
   is_available: boolean;
   compatible_waste_types: string[] | null;
   last_location_at: string | null;
+  break_reason?: string | null;
+  break_notes?: string | null;
+  break_started_at?: string | null;
+  break_expected_end_at?: string | null;
   created_at: string;
 };
 
@@ -75,6 +80,8 @@ type DriverJobRow = {
 
 const driverSelect =
   "id, partner_id, user_id, name, email, phone, vehicle_number, vehicle_type, capacity_kg, current_load, reserved_load, status, current_latitude, current_longitude, is_available, compatible_waste_types, last_location_at, created_at";
+const driverSelectWithBreak =
+  `${driverSelect}, break_reason, break_notes, break_started_at, break_expected_end_at`;
 const jobSelect =
   "id, reference_code, vendor_name, location, waste_type, fill_level, actual_weight, priority, notes, image_url, completion_image_url, facility, status, created_at, assigned_vehicle, assigned_driver_id, assignment_time, estimated_arrival, route_stop_order, vendor_latitude, vendor_longitude, vendor_phone, assigned_driver:drivers!pickup_requests_assigned_driver_id_fkey(name), pickup_assignments(distance_km, released_at, assigned_at)";
 const jobSelectWithoutAssignmentHistory =
@@ -108,6 +115,10 @@ const fromRow = (row: DriverRow): Driver => ({
   isAvailable: row.is_available,
   compatibleWasteTypes: row.compatible_waste_types ?? [],
   lastLocationAt: row.last_location_at ?? undefined,
+  breakReason: row.break_reason ?? undefined,
+  breakNotes: row.break_notes ?? undefined,
+  breakStartedAt: row.break_started_at ?? undefined,
+  breakExpectedEndAt: row.break_expected_end_at ?? undefined,
   createdAt: row.created_at,
 });
 
@@ -184,15 +195,45 @@ const pickupId = async (referenceCode: string) => {
 };
 
 export const driverService = {
+  subscribeToDrivers(onChange: () => void) {
+    const supabase = client();
+    const channel = supabase
+      .channel(`drivers:${crypto.randomUUID()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "drivers" },
+        onChange,
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  },
+
   async getDrivers() {
     const supabase = client();
     await requireUser(supabase);
-    const { data, error } = await supabase
+    const enhanced = await supabase
       .from("drivers")
-      .select(driverSelect)
+      .select(driverSelectWithBreak)
       .order("created_at");
+    let data: unknown = enhanced.data;
+    let error = enhanced.error;
+    if (
+      error &&
+      (error.code === "42703" ||
+        error.code === "PGRST204" ||
+        error.message.includes("break_reason"))
+    ) {
+      const fallback = await supabase
+        .from("drivers")
+        .select(driverSelect)
+        .order("created_at");
+      data = fallback.data;
+      error = fallback.error;
+    }
     throwDatabaseError(error, "Drivers could not be loaded.");
-    return (data as DriverRow[]).map(fromRow);
+    return ((data ?? []) as DriverRow[]).map(fromRow);
   },
 
   async getCurrentDriver() {
@@ -421,6 +462,38 @@ export const driverService = {
     const { data, error } = await supabase.rpc("process_pickup_batches");
     throwDatabaseError(error, "The assignment queue could not be processed.");
     return Number(data ?? 0);
+  },
+
+  async startBreak(payload: DriverBreakInput) {
+    const supabase = client();
+    await requireUser(supabase);
+    const { data, error } = await supabase.rpc("start_driver_break", {
+      p_reason: payload.reason,
+      p_duration_minutes: payload.durationMinutes,
+      p_notes: payload.notes || null,
+    });
+    if (error && (error.code === "42883" || error.code === "PGRST202")) {
+      throw new ServiceError(
+        "Driver breaks are not configured in Supabase. Run the latest driver-break migration.",
+        503,
+      );
+    }
+    if (error) throw new ServiceError(error.message || "The break could not be started.", 500);
+    return fromRow(data as DriverRow);
+  },
+
+  async endBreak() {
+    const supabase = client();
+    await requireUser(supabase);
+    const { data, error } = await supabase.rpc("end_driver_break");
+    if (error && (error.code === "42883" || error.code === "PGRST202")) {
+      throw new ServiceError(
+        "Driver breaks are not configured in Supabase. Run the latest driver-break migration.",
+        503,
+      );
+    }
+    if (error) throw new ServiceError(error.message || "The break could not be ended.", 500);
+    return fromRow(data as DriverRow);
   },
 
   async updateLocation(latitude: number, longitude: number) {

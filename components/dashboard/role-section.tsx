@@ -29,6 +29,7 @@ import type { WasteImageAnalysis } from "@/types/ai";
 import {
   AssignmentQueuePage,
   DriverManagementPage,
+  DriverBreakOversight,
   DriverWorkflowSection,
   FleetOverviewPage,
   PartnerAssignedJobsPage,
@@ -505,7 +506,14 @@ function MarketsPage() {
   return <div className="space-y-7"><PageHeader eyebrow="BBMP operations" title="Connected markets" description="Monitor collection volume, participation, and recycling performance by market." /><input aria-label="Search connected markets" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search market or ward…" className={`${inputClass} mt-0 max-w-xs`} />{resource.loading ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{Array.from({length:6},(_,index)=><div key={index} className="h-56 animate-pulse rounded-2xl bg-white dark:bg-slate-900" />)}</div> : resource.error ? <Panel><div className="p-8 text-center"><p className="text-xs text-rose-600">{resource.error}</p><Button size="sm" variant="outline" className="mt-4" onClick={resource.reload}>Try again</Button></div></Panel> : rows.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{rows.map((item) => <Panel key={item.market}><div className="p-5"><div className="flex justify-between"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10"><Store className="size-[18px]" /></span><StatusBadge status={item.status} /></div><h2 className="mt-6 text-sm font-semibold">{item.market}</h2><p className="mt-1 text-[10px] text-slate-400">Ward {item.ward} · {item.vendors} active vendors</p><div className="mt-5 grid grid-cols-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-950">{[["Requests", item.requests], ["Collected", item.collected], ["Recycled", item.rate]].map(([k,v]) => <div key={k}><p className="text-[9px] uppercase text-slate-400">{k}</p><p className="mt-1 text-xs font-semibold">{v}</p></div>)}</div></div></Panel>)}</div> : <Panel><EmptyState icon={<Store className="size-5" />} title="No connected markets" description="Markets will appear after they are added to Supabase and vendors are assigned." /></Panel>}</div>;
 }
 
-function AdminRequests() { return <RequestsPage history={false} admin />; }
+function AdminRequests() {
+  return (
+    <div className="space-y-4 sm:space-y-7">
+      <DriverBreakOversight />
+      <RequestsPage history={false} admin />
+    </div>
+  );
+}
 
 function PartnersPage() {
   const resource = useAsyncResource(() => analyticsService.getPartners(), "partners");

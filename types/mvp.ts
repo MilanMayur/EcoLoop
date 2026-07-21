@@ -198,6 +198,7 @@ export type DriverStatus =
   | "Available"
   | "Assigned"
   | "On route"
+  | "On break"
   | "Offline"
   | "Disabled"
   | "Maintenance";
@@ -220,7 +221,17 @@ export type Driver = {
   isAvailable: boolean;
   compatibleWasteTypes: string[];
   lastLocationAt?: string;
+  breakReason?: string;
+  breakNotes?: string;
+  breakStartedAt?: string;
+  breakExpectedEndAt?: string;
   createdAt: string;
+};
+
+export type DriverBreakInput = {
+  reason: string;
+  durationMinutes: number;
+  notes?: string;
 };
 
 export type DriverLocation = {
