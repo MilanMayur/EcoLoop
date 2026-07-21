@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { wasteTypeValues } from "@/lib/waste-taxonomy";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ const schema = z.object({
   vehicleNumber: z.string().trim().min(4).max(40),
   vehicleType: z.string().trim().min(2).max(80),
   capacityKg: z.number().positive().max(100_000),
-  compatibleWasteTypes: z.array(z.string().trim().min(1).max(60)).max(20),
+  compatibleWasteTypes: z.array(z.enum(wasteTypeValues)).min(1).max(wasteTypeValues.length),
 });
 
 export async function POST(request: Request) {
@@ -32,11 +33,23 @@ export async function POST(request: Request) {
   const { data: authData, error: authError } = await admin.auth.getUser(token);
   if (authError || !authData.user) return NextResponse.json({ error: "Your session is no longer valid." }, { status: 401 });
 
-  const { data: manager } = await admin.from("profiles")
-    .select("id, role, approval_status, is_active, organization_name")
+  let managerResult = await admin.from("profiles")
+    .select("id, role, approval_status, is_active, organization_name, accepted_waste_types")
     .eq("id", authData.user.id).single();
+  if (managerResult.error?.message.includes("accepted_waste_types")) {
+    managerResult = await admin.from("profiles")
+      .select("id, role, approval_status, is_active, organization_name")
+      .eq("id", authData.user.id).single();
+  }
+  const manager = managerResult.data as Record<string, unknown> | null;
   if (!manager || manager.role !== "recycler" || manager.approval_status !== "approved" || manager.is_active === false) {
     return NextResponse.json({ error: "Only approved recycling partners can invite drivers." }, { status: 403 });
+  }
+  const acceptedWasteTypes = Array.isArray(manager.accepted_waste_types)
+    ? manager.accepted_waste_types.filter((value): value is string => typeof value === "string")
+    : [];
+  if (acceptedWasteTypes.length && input.compatibleWasteTypes.some((value) => !acceptedWasteTypes.includes(value))) {
+    return NextResponse.json({ error: "A driver can only be assigned waste streams accepted by your company." }, { status: 400 });
   }
 
   const redirectTo = `${new URL(request.url).origin}/login?invited=1`;
@@ -45,7 +58,7 @@ export async function POST(request: Request) {
     data: {
       role: "driver",
       full_name: input.name,
-      organization_name: manager.organization_name,
+      organization_name: String(manager.organization_name ?? ""),
       phone: input.phone,
     },
   });

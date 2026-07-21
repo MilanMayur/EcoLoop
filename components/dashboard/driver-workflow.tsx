@@ -47,12 +47,12 @@ import { usePickupRealtime } from "@/hooks/use-pickup-realtime";
 import { OPERATING_HOURS_LABEL } from "@/lib/operating-hours";
 import { estimatedPickupWeightKg, STANDARD_BIN_CAPACITY_KG } from "@/lib/pickup-weight";
 import { PickupCancellationDialog } from "@/components/dashboard/pickup-cancellation-dialog";
+import { useDashboardProfile } from "@/components/dashboard/profile-context";
+import { wasteStreams, wasteTypeValues } from "@/lib/waste-taxonomy";
 
 const inputClass =
   "mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white sm:text-sm";
 const labelClass = "text-xs font-semibold text-slate-700 dark:text-slate-300";
-const wasteTypes = ["Wet", "Dry", "Plastic", "Metal", "Mixed"];
-
 const driverSchema = z.object({
   name: z.string().trim().min(2, "Enter the driver's name."),
   email: z.string().trim().email("Enter a valid email."),
@@ -61,7 +61,7 @@ const driverSchema = z.object({
   vehicleType: z.string().trim().min(2, "Enter the vehicle type."),
   capacityKg: z.coerce.number().positive("Capacity must be greater than zero."),
   compatibleWasteTypes: z
-    .array(z.string())
+    .array(z.enum(wasteTypeValues))
     .min(1, "Select at least one waste type."),
 });
 type DriverValues = z.infer<typeof driverSchema>;
@@ -422,6 +422,13 @@ export function AssignmentQueuePage() {
 }
 
 export function DriverManagementPage() {
+  const profile = useDashboardProfile();
+  const availableWasteStreams = profile?.acceptedWasteTypes.length
+    ? wasteStreams.filter((stream) => profile.acceptedWasteTypes.includes(stream.value))
+    : wasteStreams;
+  const defaultWasteTypes = profile?.acceptedWasteTypes.length
+    ? profile.acceptedWasteTypes
+    : ["Wet", "Dry"] as const;
   const resource = useAsyncResource(
     () => driverService.getDrivers(),
     "drivers",
@@ -448,7 +455,7 @@ export function DriverManagementPage() {
     formState: { errors, isSubmitting },
   } = useForm<DriverInputValues, unknown, DriverValues>({
     resolver: zodResolver(driverSchema),
-    defaultValues: { compatibleWasteTypes: ["Wet", "Dry"] },
+    defaultValues: { compatibleWasteTypes: [...defaultWasteTypes] },
   });
   const openCreate = () => {
     setEditing(null);
@@ -460,7 +467,7 @@ export function DriverManagementPage() {
       vehicleNumber: "",
       vehicleType: "Mini truck",
       capacityKg: 500,
-      compatibleWasteTypes: ["Wet", "Dry"],
+      compatibleWasteTypes: [...defaultWasteTypes],
     });
     setOpen(true);
   };
@@ -720,18 +727,18 @@ export function DriverManagementPage() {
             <fieldset className="mt-4">
               <legend className={labelClass}>Compatible waste types *</legend>
               <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
-                {wasteTypes.map((type) => (
+                {availableWasteStreams.map((stream) => (
                   <label
-                    key={type}
+                    key={stream.value}
                     className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 text-[10px] font-medium dark:border-slate-700"
                   >
                     <input
                       {...register("compatibleWasteTypes")}
                       type="checkbox"
-                      value={type}
+                      value={stream.value}
                       className="accent-emerald-600"
                     />
-                    {type}
+                    {stream.label}
                   </label>
                 ))}
               </div>

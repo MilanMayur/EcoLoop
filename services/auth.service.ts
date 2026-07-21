@@ -4,6 +4,7 @@ import { ServiceError } from "@/services/service-error";
 import { getSupabaseClient } from "@/lib/supabase";
 import { requireUser, throwDatabaseError } from "@/services/supabase.data";
 import { normalizeLocale, type Locale } from "@/lib/i18n";
+import { normalizeWasteTypes, type WasteType } from "@/lib/waste-taxonomy";
 
 export type LoginPayload = { email: string; password: string; remember?: boolean };
 export type SignupPayload = Record<string, string | string[]> & { role: DashboardRole };
@@ -23,6 +24,7 @@ export type CurrentProfile = ProfilePayload & {
   approvalStatus: string;
   isActive: boolean;
   preferredLanguage: Locale;
+  acceptedWasteTypes: WasteType[];
 };
 
 type ProfileAccess = {
@@ -90,10 +92,10 @@ export const authService = {
     const supabase = requireAuthClient();
     const user = await requireUser(supabase);
     let result = await supabase.from("profiles")
-      .select("email, full_name, organization_name, market, phone, profile_image_url, registration_number, role, requested_role, approval_status, is_active, preferred_language")
+      .select("email, full_name, organization_name, market, phone, profile_image_url, registration_number, role, requested_role, approval_status, is_active, preferred_language, accepted_waste_types")
       .eq("id", user.id).single();
 
-    if (result.error?.message.includes("preferred_language") || result.error?.message.includes("profile_image_url") || result.error?.message.includes("market")) {
+    if (result.error?.message.includes("preferred_language") || result.error?.message.includes("profile_image_url") || result.error?.message.includes("market") || result.error?.message.includes("accepted_waste_types")) {
       result = await supabase.from("profiles")
         .select("email, full_name, organization_name, phone, registration_number, role, requested_role, approval_status, is_active")
         .eq("id", user.id).single();
@@ -118,6 +120,7 @@ export const authService = {
       approvalStatus: String(row.approval_status ?? "pending"),
       isActive: row.is_active !== false,
       preferredLanguage: normalizeLocale(typeof row.preferred_language === "string" ? row.preferred_language : undefined),
+      acceptedWasteTypes: normalizeWasteTypes(row.accepted_waste_types ?? user.user_metadata?.categories),
     };
   },
 

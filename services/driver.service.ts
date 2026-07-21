@@ -15,6 +15,7 @@ import {
   isWithinOperatingHours,
   OPERATING_HOURS_LABEL,
 } from "@/lib/operating-hours";
+import { normalizeWasteTypes } from "@/lib/waste-taxonomy";
 import {
   optionalSupabase,
   relativeTime,
@@ -113,7 +114,7 @@ const fromRow = (row: DriverRow): Driver => ({
   latitude: row.current_latitude ?? undefined,
   longitude: row.current_longitude ?? undefined,
   isAvailable: row.is_available,
-  compatibleWasteTypes: row.compatible_waste_types ?? [],
+  compatibleWasteTypes: normalizeWasteTypes(row.compatible_waste_types),
   lastLocationAt: row.last_location_at ?? undefined,
   breakReason: row.break_reason ?? undefined,
   breakNotes: row.break_notes ?? undefined,

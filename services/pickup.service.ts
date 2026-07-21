@@ -9,6 +9,7 @@ import type {
 import { ServiceError } from "@/services/service-error";
 import { optionalSupabase, relativeTime, requireUser, throwDatabaseError } from "@/services/supabase.data";
 import { isWithinOperatingHours } from "@/lib/operating-hours";
+import { isWasteType, normalizeWasteTypes } from "@/lib/waste-taxonomy";
 
 const PICKUP_IMAGE_BUCKET = "pickup-images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -210,6 +211,9 @@ export const pickupService = {
   },
 
   async createPickup(payload: PickupInput) {
+    if (!isWasteType(payload.wasteType)) {
+      throw new ServiceError("Select a supported waste stream.", 400);
+    }
     const supabase = requirePickupClient();
     const user = await requireUser(supabase);
     const { data: profile, error: profileError } = await supabase.from("profiles")
@@ -235,8 +239,13 @@ export const pickupService = {
 
   async getAvailableJobs() {
     const supabase = requirePickupClient();
-    await requireUser(supabase);
-    const { data, error } = await supabase.from("pickup_requests").select(pickupSelect).eq("status", "pending").order("created_at");
+    const user = await requireUser(supabase);
+    const { data: profile } = await supabase.from("profiles")
+      .select("accepted_waste_types").eq("id", user.id).maybeSingle();
+    const acceptedWasteTypes = normalizeWasteTypes(profile?.accepted_waste_types);
+    let query = supabase.from("pickup_requests").select(pickupSelect).eq("status", "pending");
+    if (acceptedWasteTypes.length) query = query.in("waste_type", acceptedWasteTypes);
+    const { data, error } = await query.order("created_at");
     throwDatabaseError(error, "Available pickups could not be loaded.");
     return (data as PickupRow[]).map(jobFromRow);
   },

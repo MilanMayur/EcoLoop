@@ -1,4 +1,5 @@
 import type { DashboardRole, Metric, StockProduct } from "@/types/dashboard";
+import type { WasteType } from "@/lib/waste-taxonomy";
 
 export type ServiceErrorCode =
   | "NETWORK"
@@ -86,7 +87,7 @@ export type PickupJob = {
 };
 
 export type PickupInput = {
-  wasteType: string;
+  wasteType: WasteType;
   fillLevel: FillLevel;
   priority: string;
   notes?: string;
@@ -219,7 +220,7 @@ export type Driver = {
   latitude?: number;
   longitude?: number;
   isAvailable: boolean;
-  compatibleWasteTypes: string[];
+  compatibleWasteTypes: WasteType[];
   lastLocationAt?: string;
   breakReason?: string;
   breakNotes?: string;
@@ -251,7 +252,7 @@ export type DriverInput = {
   vehicleNumber: string;
   vehicleType: string;
   capacityKg: number;
-  compatibleWasteTypes: string[];
+  compatibleWasteTypes: WasteType[];
 };
 
 export type DriverPerformance = {
