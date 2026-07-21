@@ -68,6 +68,7 @@ In **Supabase Dashboard → SQL Editor**, run every file in [`supabase/migration
 | `202607200007_support_requests.sql` | Help Centre requests and BBMP-only support access |
 | `202607200008_vehicle_load_lifecycle.sql` | Reserved/collected loads and facility unloading |
 | `202607210001_role_based_pickup_cancellation.sql` | Role-based cancellation, audit logging, notifications, and assignment release |
+| `202607210002_standard_bin_weight_estimates.sql` | Supported fill levels and editable 120 kg-bin collection estimates |
 
 Migrations are incremental. Existing projects should run only pending files while preserving this order.
 

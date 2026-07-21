@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { LivePickupTracking } from "@/components/dashboard/live-tracking";
 import { usePickupRealtime } from "@/hooks/use-pickup-realtime";
 import { OPERATING_HOURS_LABEL } from "@/lib/operating-hours";
+import { estimatedPickupWeightKg, STANDARD_BIN_CAPACITY_KG } from "@/lib/pickup-weight";
 import { PickupCancellationDialog } from "@/components/dashboard/pickup-cancellation-dialog";
 
 const inputClass =
@@ -1211,6 +1212,10 @@ function DriverJobsPage() {
     remainingCapacity < Math.max(capacity * 0.1, 10);
   const advance = async (job: PickupJob) => {
     if (job.status === "Arrived") {
+      resetCollection({
+        actualWeight: estimatedPickupWeightKg(job.fillLevel),
+        notes: "",
+      });
       setCollecting(job);
       return;
     }
@@ -1499,7 +1504,7 @@ function DriverJobsPage() {
             </div>
             <div className="mt-5 grid gap-3">
               <Field
-                label="Actual weight (kg)"
+                label="Actual weight (kg) — confirm or edit"
                 error={collectionErrors.actualWeight?.message}
               >
                 <input
@@ -1509,6 +1514,9 @@ function DriverJobsPage() {
                   step="0.1"
                   className={inputClass}
                 />
+                <p className="mt-2 text-[10px] font-normal leading-4 text-slate-500">
+                  Prefilled at {estimatedPickupWeightKg(collecting.fillLevel)} kg from the vendor’s fill level and a standard {STANDARD_BIN_CAPACITY_KG} kg bin. Confirm after weighing and correct it if needed; only the submitted value becomes actual weight.
+                </p>
               </Field>
             </div>
             <label className={`${labelClass} mt-4 block`}>

@@ -6,7 +6,7 @@ export type ServiceErrorCode =
   | "NOT_FOUND"
   | "UNKNOWN";
 
-export type FillLevel = "25%" | "50%" | "75%" | "100% (Full)" | "Overflowing";
+export type FillLevel = "75%" | "100% (Full)" | "Overflowing";
 export type PickupTimelineItem = {
   status: string;
   time: string;
