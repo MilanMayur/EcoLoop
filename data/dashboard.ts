@@ -50,10 +50,10 @@ export const roleProfiles: Record<DashboardRole, RoleProfile> = {
   },
   admin: {
     role: "admin",
-    name: "BBMP account",
+    name: "TMC account",
     organization: "EcoLoop",
-    shortRole: "BBMP Officer",
-    initials: "BA",
+    shortRole: "TMC Officer",
+    initials: "TA",
   },
 };
 
@@ -61,7 +61,7 @@ export const roleLabels: Record<DashboardRole, string> = {
   vendor: "Vendor workspace",
   recycler: "Recycler workspace",
   driver: "Driver route",
-  admin: "BBMP operations",
+  admin: "TMC operations",
 };
 
 export const navigation: Record<DashboardRole, NavItem[]> = {

@@ -189,7 +189,7 @@ function DriverBreakControl({
     return (
       <Panel
         title="Break in progress"
-        subtitle="Your partner company and BBMP can see this live status."
+        subtitle="Your partner company and TMC can see this live status."
         action={
           <Button size="sm" disabled={saving} onClick={() => void end()}>
             <Coffee className="size-4" /> {saving ? "Ending…" : "End break"}

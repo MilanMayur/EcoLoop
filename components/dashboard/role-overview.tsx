@@ -61,7 +61,7 @@ const copy = {
     href: "/dashboard/driver/jobs",
   },
   admin: {
-    eyebrow: "BBMP operations",
+    eyebrow: "TMC operations",
     title: "Operations overview",
     description:
       "A live view of collection performance across your markets and recycling network.",
@@ -552,7 +552,7 @@ function AdminOverview({
             <WasteTrendChart mode="line" />
           </div>
         </Panel>
-        <Panel title="Waste type distribution" subtitle="Today across the zone">
+        <Panel title="Waste type distribution" subtitle="Today across the jurisdiction">
           <div className="p-3 sm:p-6">
             <WasteDonutChart />
           </div>

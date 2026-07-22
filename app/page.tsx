@@ -24,7 +24,7 @@ const problems = [
 
 const stakeholders = [
   { icon: Store, label: "For vendors", title: "A cleaner stall, without the coordination burden.", points: ["One-tap pickup requests", "Simple segregation guidance", "Collection status updates"] },
-  { icon: Building2, label: "For BBMP", title: "Market-wide visibility for faster civic action.", points: ["Live ward-level dashboards", "Collection SLA monitoring", "Evidence-ready reports"] },
+  { icon: Building2, label: "For TMC", title: "Market-wide visibility for faster civic action.", points: ["Live ward-level dashboards", "Collection SLA monitoring", "Evidence-ready reports"] },
   { icon: Recycle, label: "For recyclers", title: "Reliable material supply and smarter routes.", points: ["Qualified pickup leads", "Load and route planning", "Digital proof of recovery"] },
   { icon: Warehouse, label: "For market admins", title: "One calm operating view across the market.", points: ["Issue and hotspot tracking", "Vendor participation insights", "Transparent performance data"] },
 ];
@@ -55,7 +55,7 @@ export default function Home() {
               Small stock.<br /><span className="text-emerald-600">Zero waste.</span><br />Smart market.
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-6 text-slate-600 sm:mt-7 sm:text-lg sm:leading-8">
-              EcoLoop is an AI-powered Smart Market Sustainability Platform that helps vendors optimize inventory, prevent excess stock, reduce waste, and connect with BBMP and recycling partners through one intelligent digital ecosystem.
+              EcoLoop is an AI-powered Smart Market Sustainability Platform that helps vendors optimize inventory, prevent excess stock, reduce waste, and connect with TMC and recycling partners through one intelligent digital ecosystem.
             </p>
             <div className="mt-6 flex flex-col gap-2.5 sm:mt-9 sm:flex-row sm:gap-3">
               <HomepageHeroActions />
@@ -75,7 +75,7 @@ export default function Home() {
                 <span className="grid size-9 place-items-center rounded-lg bg-emerald-50 sm:size-10 sm:rounded-xl"><BrainCircuit className="size-4 text-emerald-600 sm:size-5" /></span>
               </div>
             </Float>
-            <div className="absolute -right-1 -top-5 hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-700 shadow-lg sm:flex"><Building2 className="size-5 text-blue-500" /> BBMP dashboard connected</div>
+            <div className="absolute -right-1 -top-5 hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-700 shadow-lg sm:flex"><Building2 className="size-5 text-blue-500" /> TMC dashboard connected</div>
             <div className="absolute -left-3 top-20 hidden rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-lg xl:block"><p className="text-[9px] font-bold uppercase tracking-[.12em] text-slate-400">Forecast accuracy</p><p className="mt-1 text-lg font-semibold tracking-tight text-slate-950">94%</p></div>
           </Reveal>
         </div>

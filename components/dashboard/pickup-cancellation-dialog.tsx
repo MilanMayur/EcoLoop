@@ -91,8 +91,8 @@ function PickupCancellationDialogContent({
               {role === "vendor"
                 ? "This is allowed only while the request is pending and no driver has been assigned."
                 : role === "recycler"
-                  ? "Use cancellation only for a genuine operational issue. The vendor and BBMP will be notified."
-                  : "BBMP cancellation is reserved for exceptional governance, legal, safety, or administrative situations."}
+                  ? "Use cancellation only for a genuine operational issue. The vendor and TMC will be notified."
+                  : "TMC cancellation is reserved for exceptional governance, legal, safety, or administrative situations."}
             </p>
           </div>
           <button

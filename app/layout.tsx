@@ -9,8 +9,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 
 export const metadata: Metadata = {
   title: "EcoLoop — AI-Powered Smart Market Sustainability Platform",
-  description: "EcoLoop helps vendors optimize inventory, prevent excess stock, reduce waste, and connect with BBMP and recycling partners in one intelligent ecosystem.",
-  keywords: ["inventory forecasting", "circular economy", "waste management", "smart market", "BBMP", "recycling"],
+  description: "EcoLoop helps vendors optimize inventory, prevent excess stock, reduce waste, and connect with TMC and recycling partners in one intelligent ecosystem.",
+  keywords: ["inventory forecasting", "circular economy", "waste management", "smart market", "TMC", "recycling"],
   icons: {
     icon: [{ url: "/Logo.png", type: "image/png" }],
     apple: "/Logo.png",

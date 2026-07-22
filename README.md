@@ -1,6 +1,6 @@
 # EcoLoop
 
-EcoLoop is an AI-assisted civic-tech platform connecting market vendors, authorised recycling partners, drivers, and BBMP operations in one circular-waste workflow.
+EcoLoop is an AI-assisted civic-tech platform connecting market vendors, authorised recycling partners, drivers, and TMC operations in one circular-waste workflow.
 
 > **Small Stock. Zero Waste. Smart Market.**
 
@@ -9,7 +9,7 @@ EcoLoop is an AI-assisted civic-tech platform connecting market vendors, authori
 - **Vendors:** smart stock, fill-level pickup requests, photo uploads, status tracking, and sustainability insights.
 - **Recycling partners:** driver and fleet management, batched assignments, live collection monitoring, and facility delivery.
 - **Drivers:** assigned jobs, live location, collection stages, actual-weight recording, and vehicle unloading.
-- **BBMP:** market, pickup, partner, analytics, report, tracking, and Help Centre oversight.
+- **TMC:** market, pickup, partner, analytics, report, tracking, and Help Centre oversight.
 - **AI Copilot:** inventory analysis, recommendations, explanations, reports, and contextual chat through a secure server route.
 - **Languages:** English, Kannada, and Hindi on public, authentication, and dashboard screens.
 
@@ -66,11 +66,13 @@ In **Supabase Dashboard → SQL Editor**, run every file in [`supabase/migration
 | `202607200004_link_vendor_markets.sql` | Vendor-to-market linking and data backfill |
 | `202607200005_live_driver_tracking.sql` | Realtime driver locations and access policies |
 | `202607200006_assignment_operating_hours.sql` | Assignment hours: 06:00–21:00 Asia/Kolkata |
-| `202607200007_support_requests.sql` | Help Centre requests and BBMP-only support access |
+| `202607200007_support_requests.sql` | Help Centre requests and TMC-only support access |
 | `202607200008_vehicle_load_lifecycle.sql` | Reserved/collected loads and facility unloading |
 | `202607210001_role_based_pickup_cancellation.sql` | Role-based cancellation, audit logging, notifications, and assignment release |
 | `202607210002_standard_bin_weight_estimates.sql` | Supported fill levels and editable 120 kg-bin collection estimates |
-| `202607210003_driver_break_visibility.sql` | Timed driver breaks, assignment pause, live partner/BBMP visibility, notifications, and audit history |
+| `202607210003_driver_break_visibility.sql` | Timed driver breaks, assignment pause, live partner/TMC visibility, notifications, and audit history |
+| `202607210004_partner_waste_capabilities.sql` | Shared partner, pickup, and driver waste-stream capabilities |
+| `202607220001_tmc_terminology.sql` | Updates deployed cancellation messages and notifications to TMC terminology |
 
 Migrations are incremental. Existing projects should run only pending files while preserving this order.
 
@@ -78,7 +80,7 @@ Migrations are incremental. Existing projects should run only pending files whil
 
 If EcoLoop displays **“Help Centre is not configured in Supabase”**, run the complete [`202607200007_support_requests.sql`](supabase/migrations/202607200007_support_requests.sql) file, then run `202607200008_vehicle_load_lifecycle.sql` if it is pending and refresh the application.
 
-The support migration creates `support_requests`, its request-creation function, indexes, grants, and Row Level Security policies. Signed-in users can create and view their own requests; approved BBMP administrators can view and manage all requests.
+The support migration creates `support_requests`, its request-creation function, indexes, grants, and Row Level Security policies. Signed-in users can create and view their own requests; approved TMC administrators can view and manage all requests.
 
 ### 4. Configure Supabase Auth
 
@@ -99,16 +101,16 @@ pnpm dev -- --port 3000
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## First BBMP administrator
+## First TMC administrator
 
-Create the first BBMP account through signup, then approve it once in the SQL Editor:
+Create the first TMC account through signup, then approve it once in the SQL Editor:
 
 ```sql
 update public.profiles
 set role = 'admin',
     approval_status = 'approved',
     approved_at = now()
-where email = 'your-bbmp-email@example.com';
+where email = 'your-tmc-email@example.com';
 ```
 
 Use the migration-provided `review_profile` function for later approvals.

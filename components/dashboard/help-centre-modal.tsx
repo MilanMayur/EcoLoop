@@ -117,7 +117,7 @@ export function HelpCentreModal({
               {t("EcoLoop Help Centre")}
             </h2>
             <p className="mt-1 text-[11px] leading-5 text-slate-500">
-              {t("Tell BBMP support what you need help with.")}
+              {t("Tell TMC support what you need help with.")}
             </p>
           </div>
           <Button
@@ -140,7 +140,7 @@ export function HelpCentreModal({
               {t("Support request submitted")}
             </h3>
             <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-slate-500">
-              {t("BBMP support can now review your issue and account details.")}
+              {t("TMC support can now review your issue and account details.")}
             </p>
             <p className="mt-3 text-[9px] font-medium text-slate-400">
               {t("Reference")} · {requestId.slice(0, 8).toUpperCase()}

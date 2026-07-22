@@ -1,4 +1,4 @@
--- Keep the BBMP market view connected to vendor registrations. Existing
+-- Keep the TMC market view connected to vendor registrations. Existing
 -- profiles retain their market text; market_id is populated automatically.
 create or replace function public.link_profile_market()
 returns trigger
@@ -15,7 +15,7 @@ begin
   end if;
 
   -- Treat "Chandapura" and "Chandapura Market" as the same market while
-  -- preserving a clear, consistent display name for the BBMP dashboard.
+  -- preserving a clear, consistent display name for the TMC dashboard.
   resolved_market_name := initcap(lower(regexp_replace(trim(new.market), '\\s+market\\s*$', '', 'i'))) || ' Market';
 
   select id into resolved_market_id

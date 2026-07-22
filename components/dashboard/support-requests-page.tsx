@@ -24,14 +24,14 @@ const roleLabel = {
   vendor: "Vendor",
   recycler: "Recycling partner",
   driver: "Driver",
-  admin: "BBMP officer",
+  admin: "TMC officer",
 } as const;
 
 export function SupportRequestsPage() {
   const { t } = useLanguage();
   const resource = useAsyncResource(
     () => supportService.getRequests(),
-    "bbmp-support-requests",
+    "tmc-support-requests",
   );
   const [search, setSearch] = useState("");
 
@@ -61,7 +61,7 @@ export function SupportRequestsPage() {
   return (
     <div className="space-y-4 sm:space-y-7">
       <PageHeader
-        eyebrow={t("BBMP support")}
+        eyebrow={t("TMC support")}
         title={t("Support requests")}
         description={t("Review issues submitted by authenticated EcoLoop users.")}
       />
